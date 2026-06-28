@@ -23,7 +23,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 # ═══════════════════════════════════════════════════════
 BOT_TOKEN         = os.getenv("BOT_TOKEN")
 MONGO_URI         = os.getenv("MONGO_URI")
-REQUIRED_CHANNEL  = os.getenv("CHANNEL", "@trade_chanel_uz")
+# Majburiy obuna — 3 ta kanal
+REQUIRED_CHANNELS = ["@bulldrop_n1", "@uzbekroblox", "@trade_chanel_uz"]
 TRADE_CHANNEL     = "@trade_chanel_uz"   # e'lonlar yuboriladigan kanal
 CARD_NUMBER       = os.getenv("CARD_NUMBER", "5614682091344749")   # tire YO'Q
 CARD_OWNER        = os.getenv("CARD_OWNER", "Nurboyev.N")
@@ -370,14 +371,6 @@ class AdFlow(StatesGroup):
     photo = State()
     bio   = State()
 
-class AutoxabarFlow(StatesGroup):
-    login_phone  = State()
-    login_code   = State()
-    login_2fa    = State()
-    photo        = State()
-    text         = State()
-    confirm_edit = State()
-
 # Online trader states
 class OnlineTraderAdd(StatesGroup):
     photo = State()
@@ -397,9 +390,19 @@ dp  = Dispatcher(storage=MemoryStorage())
 # ═══════════════════════════════════════════════════════
 # KEYBOARDS
 # ═══════════════════════════════════════════════════════
-def sub_kb():
+CHANNEL_LABELS = {
+    "@bulldrop_n1":      "1️⃣ @bulldrop_n1 kanalga obuna bo'lish",
+    "@uzbekroblox":      "2️⃣ @uzbekroblox kanalga obuna bo'lish",
+    "@trade_chanel_uz":  "3️⃣ @trade_chanel_uz kanalga obuna bo'lish",
+}
+
+def sub_kb(missing_channels=None):
+    if missing_channels is None:
+        missing_channels = REQUIRED_CHANNELS
     b = InlineKeyboardBuilder()
-    b.button(text="📢 @trade_chanel_uz kanalga obuna bo'lish", url=f"https://t.me/trade_chanel_uz")
+    for ch in missing_channels:
+        label = CHANNEL_LABELS.get(ch, f"📢 {ch} kanalga obuna bo'lish")
+        b.button(text=label, url=f"https://t.me/{ch.lstrip('@')}")
     b.button(text="✅ Obunani tasdiqlash", callback_data="check_sub")
     b.adjust(1)
     return b.as_markup()
@@ -420,7 +423,7 @@ def main_kb():
     b.button(text="📣 Reklama qilish")
     b.button(text="🛡 Adminlik xizmati")
     b.button(text="💡 Taklif berish")
-    b.button(text="📢 Autoxabar")
+    b.button(text="🔍 Qidiruv")
     b.adjust(2, 2, 2, 2, 2, 1, 2, 1)
     return b.as_markup(resize_keyboard=True)
 
@@ -439,19 +442,33 @@ def skip_cancel_kb():
 # ═══════════════════════════════════════════════════════
 # UTILS
 # ═══════════════════════════════════════════════════════
+async def not_subscribed_channels(uid: int) -> list:
+    """Obuna bo'lmagan kanallar ro'yxatini qaytaradi. Bo'sh ro'yxat = hammasiga obuna."""
+    missing = []
+    for ch in REQUIRED_CHANNELS:
+        try:
+            m = await bot.get_chat_member(chat_id=ch, user_id=uid)
+            if m.status in ["left", "kicked", "banned"]:
+                missing.append(ch)
+        except Exception as e:
+            logging.error(f"Sub check xato ({ch}): {e}")
+            # Bot kanalga admin qilib qo'shilmagan yoki kanal topilmadi —
+            # xavfsizlik uchun obuna bo'lmagan deb hisoblaymiz va admin loglarda ko'radi
+            missing.append(ch)
+    return missing
+
 async def is_sub(uid: int) -> bool:
-    try:
-        m1 = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=uid)
-        ok1 = m1.status not in ["left", "kicked", "banned"]
-    except Exception as e:
-        logging.error(f"Sub check xato: {e}")
-        ok1 = True
-    return ok1
+    missing = await not_subscribed_channels(uid)
+    return len(missing) == 0
 
 async def check_access(msg: types.Message, state: FSMContext) -> bool:
     uid = msg.from_user.id
-    if not await is_sub(uid):
-        await msg.answer("❌ Avval @trade_chanel_uz kanalga obuna bo'ling!", reply_markup=sub_kb())
+    missing = await not_subscribed_channels(uid)
+    if missing:
+        await msg.answer(
+            "❌ Botdan foydalanish uchun avval barcha kanallarga obuna bo'ling!",
+            reply_markup=sub_kb(missing)
+        )
         return False
     return True
 
@@ -561,8 +578,12 @@ async def post_online_trader_to_channel(uname: str, nick: str, bio: str, photo_i
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message, state: FSMContext):
     uid = msg.from_user.id
-    if not await is_sub(uid):
-        await msg.answer("👋 Salom! Botdan foydalanish uchun avval @trade_chanel_uz kanalimizga obuna bo'ling!", reply_markup=sub_kb())
+    missing = await not_subscribed_channels(uid)
+    if missing:
+        await msg.answer(
+            "👋 Salom! Botdan foydalanish uchun avval quyidagi kanallarga obuna bo'ling!",
+            reply_markup=sub_kb(missing)
+        )
         return
     await upsert_user(uid, msg.from_user.username or "user")
     await msg.answer(
@@ -579,8 +600,13 @@ async def cmd_start(msg: types.Message, state: FSMContext):
 @dp.callback_query(F.data == "check_sub")
 async def cb_check_sub(cb: types.CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
-    if not await is_sub(uid):
-        await cb.answer("❌ Hali @trade_chanel_uz kanalga obuna bo'lmagansiz!", show_alert=True)
+    missing = await not_subscribed_channels(uid)
+    if missing:
+        await cb.answer("❌ Hali barcha kanallarga obuna bo'lmagansiz!", show_alert=True)
+        try:
+            await cb.message.edit_reply_markup(reply_markup=sub_kb(missing))
+        except Exception:
+            pass
         return
     try:
         await cb.message.delete()
@@ -678,8 +704,9 @@ async def cmd_deposit(msg: types.Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("damt_"))
 async def cb_damt(cb: types.CallbackQuery, state: FSMContext):
-    if not await is_sub(cb.from_user.id):
-        await cb.answer("❌ Avval kanalga obuna bo'ling!", show_alert=True)
+    missing = await not_subscribed_channels(cb.from_user.id)
+    if missing:
+        await cb.answer("❌ Avval barcha kanallarga obuna bo'ling!", show_alert=True)
         return
     if cb.data == "damt_custom":
         await cb.message.answer("✏️ Miqdorni yozing (so'mda, min 1000):", reply_markup=cancel_kb())
@@ -834,11 +861,12 @@ async def cmd_buy(msg: types.Message, state: FSMContext):
         reply_markup=b.as_markup()
     )
 
-@dp.callback_query(F.data.startswith("buy_"))
+@dp.callback_query(lambda cb: bool(cb.data) and cb.data.startswith("buy_") and cb.data[len("buy_"):].isdigit())
 async def cb_buy(cb: types.CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
-    if not await is_sub(uid):
-        await cb.answer("❌ Avval @trade_chanel_uz kanalga obuna bo'ling!", show_alert=True)
+    missing = await not_subscribed_channels(uid)
+    if missing:
+        await cb.answer("❌ Avval barcha kanallarga obuna bo'ling!", show_alert=True)
         return
     u = await get_user(uid)
     if not u:
@@ -940,7 +968,7 @@ async def cb_buy_confirm(cb: types.CallbackQuery, state: FSMContext):
         f"💵 To'langan: *{price:,} so'm*\n"
         f"🎮 Nik: `{esc_md(nick)}`\n"
         f"📋 Buyurtma #{short_id(oid)}\n\n"
-        f"⏳ Admin javobini kuting.",
+        f"😴 Admin tasdiqlagunicha kutib turing.",
         reply_markup=main_kb()
     )
     await cb.answer()
@@ -1926,476 +1954,200 @@ async def ad_bio(msg: types.Message, state: FSMContext):
     )
 
 # ═══════════════════════════════════════════════════════
-# AUTOXABAR BO'LIMI  (Telethon MTProto orqali)
+# 🔍 QIDIRUV BO'LIMI  (ID orqali / Ism orqali)
 # ═══════════════════════════════════════════════════════
-from telethon import TelegramClient
-from telethon.sessions import StringSession
-from telethon.errors import (
-    SessionPasswordNeededError, PhoneCodeInvalidError,
-    PhoneCodeExpiredError, FloodWaitError
-)
-from telethon.tl.types import Channel, Chat
+class SearchFlow(StatesGroup):
+    by_id   = State()
+    by_name = State()
 
-TELEGRAM_API_ID   = int(os.getenv("TELEGRAM_API_ID", "0"))
-TELEGRAM_API_HASH = os.getenv("TELEGRAM_API_HASH", "")
-
-_tl_clients: dict[int, TelegramClient] = {}
-
-async def ax_get(uid: int) -> dict:
-    doc = await autoxabar_db.find_one({"user_id": uid})
-    if not doc:
-        doc = {
-            "user_id": uid,
-            "session": None,
-            "photo":   None,
-            "text":    None,
-            "running": False,
-            "interval": 5,
-            "groups":  [],
-        }
-        await autoxabar_db.insert_one(doc)
-    return doc
-
-async def ax_set(uid: int, **kwargs):
-    await autoxabar_db.update_one({"user_id": uid}, {"$set": kwargs}, upsert=True)
-
-async def _tl_get_client(uid: int):
-    doc = await ax_get(uid)
-    session_str = doc.get("session")
-    if not session_str:
-        return None
-    client = TelegramClient(StringSession(session_str), TELEGRAM_API_ID, TELEGRAM_API_HASH)
-    try:
-        await client.connect()
-        if not await client.is_user_authorized():
-            await client.disconnect()
-            return None
-    except Exception:
-        return None
-    return client
-
-_ax_tasks: dict[int, asyncio.Task] = {}
-
-async def _ax_sender(uid: int):
-    while True:
-        doc = await ax_get(uid)
-        if not doc.get("running"):
-            break
-        interval = doc.get("interval", 5) * 60
-        groups   = doc.get("groups", [])
-        photo    = doc.get("photo")
-        text     = doc.get("text", "")
-        client   = await _tl_get_client(uid)
-        if client:
-            for chat_id in groups:
-                try:
-                    if photo:
-                        tg_file    = await bot.get_file(photo)
-                        file_bytes = await bot.download_file(tg_file.file_path)
-                        await client.send_file(chat_id, file_bytes, caption=text)
-                    else:
-                        await client.send_message(chat_id, text)
-                except FloodWaitError as e:
-                    logging.warning(f"FloodWait {e.seconds}s uid={uid}")
-                    await asyncio.sleep(e.seconds)
-                except Exception as e:
-                    logging.warning(f"Autoxabar xato ({chat_id}): {e}")
-                await asyncio.sleep(2)
-            await client.disconnect()
-        else:
-            logging.warning(f"uid={uid} session topilmadi, autoxabar to'xtatildi")
-            await ax_set(uid, running=False)
-            break
-        await asyncio.sleep(interval)
-
-def _ax_start_task(uid: int):
-    if uid in _ax_tasks and not _ax_tasks[uid].done():
-        return
-    _ax_tasks[uid] = asyncio.create_task(_ax_sender(uid))
-
-def _ax_stop_task(uid: int):
-    if uid in _ax_tasks:
-        _ax_tasks[uid].cancel()
-        del _ax_tasks[uid]
-
-def ax_main_kb():
+def search_menu_kb():
     b = InlineKeyboardBuilder()
-    b.button(text="✏️ Reklama yozish",            callback_data="ax_write")
-    b.button(text="▶️ Xabar yuborishni boshlash",  callback_data="ax_toggle")
-    b.button(text="👥 Guruhlar",                    callback_data="ax_groups")
-    b.button(text="⏱ Vaqtni sozlash",               callback_data="ax_time")
+    b.button(text="🆔 ID orqali qidirish",  callback_data="search_by_id")
+    b.button(text="📝 Ism orqali qidirish", callback_data="search_by_name")
     b.adjust(1)
     return b.as_markup()
 
-def ax_time_kb(current: int):
+def _result_kb(kind: str, oid, username: str = ""):
     b = InlineKeyboardBuilder()
-    for m in [5, 4, 3, 2, 1]:
-        mark = "✅ " if m == current else ""
-        b.button(text=f"{mark}{m} daqiqa", callback_data=f"axtime_{m}")
-    b.button(text="🔢 Boshqa vaqt", callback_data="axtime_custom")
-    b.button(text="🔙 Orqaga",      callback_data="ax_back")
+    if username:
+        b.button(text="💬 Murojaat", url=f"https://t.me/{username}")
+    if kind == "trade":
+        b.button(text="🛒 Savatga solish", callback_data=f"add_trade_cart_{oid}")
+    elif kind == "sale":
+        b.button(text="🛒 Savatga solish", callback_data=f"add_sale_cart_{oid}")
     b.adjust(1)
     return b.as_markup()
 
-def ax_groups_kb(groups_list: list, selected: list):
-    b = InlineKeyboardBuilder()
-    for g in groups_list:
-        gid   = g["id"]
-        gname = g.get("title", str(gid))[:30]
-        mark  = "✅ " if gid in selected else "❌ "
-        safe_id = str(gid).replace("-", "n")
-        b.button(text=f"{mark}{gname}", callback_data=f"axgrp_{safe_id}")
-    b.button(text="🔙 Orqaga", callback_data="ax_back")
-    b.adjust(1)
-    return b.as_markup()
-
-async def _ax_show_menu(target, uid: int, edit=False):
-    doc = await ax_get(uid)
-    logged_in    = bool(doc.get("session"))
-    status       = "▶️ Ishlamoqda" if doc.get("running") else "⏹ To'xtatilgan"
-    reklama      = doc.get("text") or "Yo'q"
-    interval     = doc.get("interval", 5)
-    groups_count = len(doc.get("groups", []))
-    auth_line    = "✅ Kirgan" if logged_in else "❌ Kirilmagan"
-    text = (
-        f"📢 *Autoxabar*\n\n"
-        f"🔐 Akkaunt: *{auth_line}*\n"
-        f"📊 Holat: *{status}*\n"
-        f"⏱ Interval: *{interval} daqiqa*\n"
-        f"👥 Guruhlar: *{groups_count} ta*\n"
-        f"📝 Reklama: _{esc_md(reklama[:50])}{'...' if len(reklama)>50 else ''}_\n\n"
-        f"Bo'limni tanlang:"
+async def _send_trade_result(msg: types.Message, t: dict):
+    caption = (
+        f"🔄 *Trade #{short_id(t['_id'])}*\n"
+        f"👤 @{esc_md(t.get('username','-'))}\n"
+        f"📦 {esc_md(t['name'])}\n"
+        f"📝 {esc_md(t.get('bio') or '-')}\n"
+        f"📅 {t.get('created_at','-')}"
     )
-    kb = ax_main_kb()
-    if edit:
-        try:
-            if target.message.photo:
-                await target.message.delete()
-                await target.message.answer(text, reply_markup=kb)
-            else:
-                await target.message.edit_text(text, reply_markup=kb)
-        except Exception:
-            try:
-                await target.message.answer(text, reply_markup=kb)
-            except Exception:
-                pass
+    kb = _result_kb("trade", t["_id"], t.get("username", ""))
+    if t.get("photo_id"):
+        await msg.answer_photo(t["photo_id"], caption=caption, reply_markup=kb)
     else:
-        await target.answer(text, reply_markup=kb)
+        await msg.answer(caption, reply_markup=kb)
 
-@dp.message(F.text == "📢 Autoxabar")
-async def cmd_autoxabar(msg: types.Message, state: FSMContext):
+async def _send_sale_result(msg: types.Message, s: dict):
+    caption = (
+        f"🛍 *Sotuv #{short_id(s['_id'])}*\n"
+        f"👤 @{esc_md(s.get('username','-'))}\n"
+        f"📦 {esc_md(s['name'])}\n"
+        f"📝 {esc_md(s.get('bio') or '-')}\n"
+        f"💰 {s['price']:,} {esc_md(s['currency'])}\n"
+        f"📅 {s.get('created_at','-')}"
+    )
+    kb = _result_kb("sale", s["_id"], s.get("username", ""))
+    if s.get("photo_id"):
+        await msg.answer_photo(s["photo_id"], caption=caption, reply_markup=kb)
+    else:
+        await msg.answer(caption, reply_markup=kb)
+
+async def _send_ot_result(msg: types.Message, t: dict):
+    status = "🟢 Online" if t.get("is_online") else "🔴 Offline"
+    caption = (
+        f"🌐 *Online Trader*\n"
+        f"👤 @{esc_md(t.get('username','-'))}\n"
+        f"🎮 Roblox nik: `{esc_md(t.get('roblox_nick','-'))}`\n"
+        f"📝 {esc_md(t.get('bio') or '-')}\n"
+        f"📊 Holat: {status}"
+    )
+    kb = _result_kb("ot", t.get("user_id"), t.get("username", ""))
+    if t.get("photo_id"):
+        await msg.answer_photo(t["photo_id"], caption=caption, reply_markup=kb)
+    else:
+        await msg.answer(caption, reply_markup=kb)
+
+@dp.message(F.text == "🔍 Qidiruv")
+async def cmd_search(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
     await state.clear()
-    uid = msg.from_user.id
-    doc = await ax_get(uid)
-    if not doc.get("session"):
-        await _ax_ask_phone(msg, state)
-        return
-    client = await _tl_get_client(uid)
-    if not client:
-        await ax_set(uid, session=None)
-        await _ax_ask_phone(msg, state)
-        return
-    await client.disconnect()
-    await _ax_show_menu(msg, uid)
-
-async def _ax_ask_phone(msg: types.Message, state: FSMContext):
     await msg.answer(
-        "📱 *Autoxabar — Kirish*\n\n"
-        "Telegram akkauntingizga kirish uchun telefon raqamingizni yuboring.\n"
-        "_(Xalqaro format: +998901234567)_",
+        "🔍 *Qidiruv bo'limi*\n\n"
+        "Qaysi usul orqali qidirmoqchisiz?\n\n"
+        "🆔 *ID orqali* — Telegram ID yoki e'lon ID (masalan: `123456789` yoki `A1B2C3`)\n"
+        "📝 *Ism orqali* — Roblox nik, e'lon nomi yoki @username",
+        reply_markup=search_menu_kb()
+    )
+
+@dp.callback_query(F.data == "search_by_id")
+async def cb_search_by_id(cb: types.CallbackQuery, state: FSMContext):
+    await cb.message.answer(
+        "🆔 *ID orqali qidiruv*\n\n"
+        "Qidirish uchun ID yuboring:\n"
+        "• Foydalanuvchi Telegram ID (masalan: `123456789`)\n"
+        "• Trade/Sotuv e'lon ID (masalan: `A1B2C3`)",
         reply_markup=cancel_kb()
     )
-    await state.set_state(AutoxabarFlow.login_phone)
-
-@dp.message(AutoxabarFlow.login_phone)
-async def ax_login_phone(msg: types.Message, state: FSMContext):
-    if msg.text == "❌ Bekor qilish":
-        await state.clear()
-        await msg.answer("Bekor qilindi.", reply_markup=main_kb())
-        return
-    phone  = msg.text.strip()
-    uid    = msg.from_user.id
-    client = TelegramClient(StringSession(), TELEGRAM_API_ID, TELEGRAM_API_HASH)
-    try:
-        await client.connect()
-        sent = await client.send_code_request(phone)
-        _tl_clients[uid] = client
-        await state.update_data(ax_phone=phone, ax_phone_hash=sent.phone_code_hash)
-        await msg.answer(
-            f"📩 *Kod yuborildi!*\n\n"
-            f"`{phone}` raqamiga Telegram kodi keldi.\n"
-            f"Kodni yuboring:",
-            reply_markup=cancel_kb()
-        )
-        await state.set_state(AutoxabarFlow.login_code)
-    except FloodWaitError as e:
-        await client.disconnect()
-        await msg.answer(f"⏳ Juda ko'p urinish. {e.seconds} soniya kuting.")
-        await state.clear()
-    except Exception as e:
-        await client.disconnect()
-        await msg.answer(f"❌ Xato: {e}\n\nRaqamni to'g'ri kiriting:")
-
-@dp.message(AutoxabarFlow.login_code)
-async def ax_login_code(msg: types.Message, state: FSMContext):
-    if msg.text == "❌ Bekor qilish":
-        uid = msg.from_user.id
-        c   = _tl_clients.pop(uid, None)
-        if c:
-            await c.disconnect()
-        await state.clear()
-        await msg.answer("Bekor qilindi.", reply_markup=main_kb())
-        return
-    uid        = msg.from_user.id
-    code       = msg.text.strip().replace(" ", "")
-    d          = await state.get_data()
-    phone      = d.get("ax_phone")
-    phone_hash = d.get("ax_phone_hash")
-    client     = _tl_clients.get(uid)
-    if not client:
-        await state.clear()
-        await msg.answer("❌ Session tugadi. Qaytadan boshlang.", reply_markup=main_kb())
-        return
-    try:
-        await client.sign_in(phone=phone, code=code, phone_code_hash=phone_hash)
-        session_str = client.session.save()
-        await client.disconnect()
-        _tl_clients.pop(uid, None)
-        await ax_set(uid, session=session_str)
-        await state.clear()
-        await msg.answer("✅ *Muvaffaqiyatli kirdingiz!*\n\nEndi autoxabar bo'limidan foydalanishingiz mumkin.", reply_markup=main_kb())
-        await _ax_show_menu(msg, uid)
-    except SessionPasswordNeededError:
-        await state.set_state(AutoxabarFlow.login_2fa)
-        await msg.answer("🔐 *2FA parol kerak*\n\nTelegram parolingizni yuboring:", reply_markup=cancel_kb())
-    except (PhoneCodeInvalidError, PhoneCodeExpiredError):
-        await msg.answer("❌ Kod noto'g'ri yoki muddati o'tgan. Qayta yuboring:")
-    except Exception as e:
-        await msg.answer(f"❌ Xato: {e}")
-
-@dp.message(AutoxabarFlow.login_2fa)
-async def ax_login_2fa(msg: types.Message, state: FSMContext):
-    if msg.text == "❌ Bekor qilish":
-        uid = msg.from_user.id
-        c   = _tl_clients.pop(uid, None)
-        if c:
-            await c.disconnect()
-        await state.clear()
-        await msg.answer("Bekor qilindi.", reply_markup=main_kb())
-        return
-    uid      = msg.from_user.id
-    password = msg.text.strip()
-    client   = _tl_clients.get(uid)
-    if not client:
-        await state.clear()
-        await msg.answer("❌ Session tugadi. Qaytadan boshlang.", reply_markup=main_kb())
-        return
-    try:
-        await client.sign_in(password=password)
-        session_str = client.session.save()
-        await client.disconnect()
-        _tl_clients.pop(uid, None)
-        await ax_set(uid, session=session_str)
-        await state.clear()
-        await msg.answer("✅ *Muvaffaqiyatli kirdingiz!*", reply_markup=main_kb())
-        await _ax_show_menu(msg, uid)
-    except Exception as e:
-        await msg.answer(f"❌ Parol noto'g'ri: {e}")
-
-@dp.callback_query(F.data == "ax_back")
-async def ax_back(cb: types.CallbackQuery, state: FSMContext):
-    await state.clear()
-    await _ax_show_menu(cb, cb.from_user.id, edit=True)
+    await state.set_state(SearchFlow.by_id)
     await cb.answer()
 
-@dp.callback_query(F.data == "ax_write")
-async def ax_write(cb: types.CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data == "search_by_name")
+async def cb_search_by_name(cb: types.CallbackQuery, state: FSMContext):
     await cb.message.answer(
-        "📸 *Reklama rasmi*\n\nRasm yuboring yoki o'tkazib yuboring:",
-        reply_markup=skip_cancel_kb()
+        "📝 *Ism orqali qidiruv*\n\n"
+        "Roblox nik, e'lon nomi yoki @username yozing:",
+        reply_markup=cancel_kb()
     )
-    await state.set_state(AutoxabarFlow.photo)
+    await state.set_state(SearchFlow.by_name)
     await cb.answer()
 
-@dp.message(AutoxabarFlow.photo, F.photo)
-async def ax_photo_recv(msg: types.Message, state: FSMContext):
-    await state.update_data(ax_photo=msg.photo[-1].file_id)
-    await msg.answer("📝 Reklama matnini yozing:", reply_markup=cancel_kb())
-    await state.set_state(AutoxabarFlow.text)
-
-@dp.message(AutoxabarFlow.photo)
-async def ax_photo_skip(msg: types.Message, state: FSMContext):
+@dp.message(SearchFlow.by_id)
+async def search_by_id_handler(msg: types.Message, state: FSMContext):
     if msg.text == "❌ Bekor qilish":
         await state.clear()
         await msg.answer("Bekor qilindi.", reply_markup=main_kb())
         return
-    if msg.text == "⏭ O'tkazib yuborish":
-        await state.update_data(ax_photo=None)
-        await msg.answer("📝 Reklama matnini yozing:", reply_markup=cancel_kb())
-        await state.set_state(AutoxabarFlow.text)
-        return
-    await msg.answer("❌ Rasm yuboring yoki O'tkazib yuborish tugmasini bosing:")
-
-@dp.message(AutoxabarFlow.text)
-async def ax_text_recv(msg: types.Message, state: FSMContext):
-    if msg.text == "❌ Bekor qilish":
-        await state.clear()
-        await msg.answer("Bekor qilindi.", reply_markup=main_kb())
-        return
-    uid   = msg.from_user.id
-    d     = await state.get_data()
-    photo = d.get("ax_photo")
-    text  = msg.text.strip()
-    await ax_set(uid, photo=photo, text=text)
+    query = msg.text.strip().lstrip("@")
     await state.clear()
-    b = InlineKeyboardBuilder()
-    b.button(text="✏️ Tahrirlash", callback_data="ax_write")
-    b.button(text="🔙 Orqaga",     callback_data="ax_back")
-    b.adjust(1)
-    preview = f"📣 *Reklama saqlandi!*\n\n📝 Matn: _{esc_md(text[:100])}_"
-    if photo:
-        await msg.answer_photo(photo, caption=preview, reply_markup=b.as_markup())
-    else:
-        await msg.answer(preview, reply_markup=b.as_markup())
-    await msg.answer("👆 Yuqoridagi tugmalardan foydalaning.", reply_markup=main_kb())
+    found = False
 
-@dp.callback_query(F.data == "ax_toggle")
-async def ax_toggle(cb: types.CallbackQuery):
-    uid = cb.from_user.id
-    doc = await ax_get(uid)
-    if not doc.get("text"):
-        await cb.answer("❌ Avval reklama yozing! (1-bo'lim)", show_alert=True)
-        return
-    if not doc.get("groups"):
-        await cb.answer("❌ Avval guruhlarni tanlang! (3-bo'lim)", show_alert=True)
-        return
-    if not doc.get("session"):
-        await cb.answer("❌ Avval akkauntga kiring!", show_alert=True)
-        return
-    running = doc.get("running", False)
-    if running:
-        await ax_set(uid, running=False)
-        _ax_stop_task(uid)
-        await cb.answer("⏹ Autoxabar to'xtatildi!", show_alert=True)
-    else:
-        await ax_set(uid, running=True)
-        _ax_start_task(uid)
-        await cb.answer("▶️ Autoxabar boshlandi!", show_alert=True)
-    await _ax_show_menu(cb, uid, edit=True)
+    # 1) Telegram user_id bo'yicha qidirish — odamni topish
+    if query.isdigit():
+        uid_q = int(query)
+        u = await get_user(uid_q)
+        if u:
+            found = True
+            tr_count = len(await my_trades(uid_q))
+            sl_count = len(await my_sales(uid_q))
+            ot       = await get_online_trader(uid_q)
+            ot_status = "🟢 Online" if (ot and ot.get("is_online")) else ("🔴 Offline" if ot else "—")
+            await msg.answer(
+                f"👤 *Foydalanuvchi topildi*\n"
+                f"🆔 ID: `{uid_q}`\n"
+                f"📛 Username: @{esc_md(u.get('username','-'))}\n"
+                f"🔄 Faol tradelari: *{tr_count}*\n"
+                f"🛍 Faol sotuvlari: *{sl_count}*\n"
+                f"🌐 Online trader holati: {ot_status}"
+            )
+            for t in await my_trades(uid_q):
+                await _send_trade_result(msg, t)
+            for s in await my_sales(uid_q):
+                await _send_sale_result(msg, s)
+            if ot:
+                await _send_ot_result(msg, ot)
 
-@dp.callback_query(F.data == "ax_groups")
-async def ax_groups(cb: types.CallbackQuery):
-    uid = cb.from_user.id
-    doc = await ax_get(uid)
-    if not doc.get("session"):
-        await cb.answer("❌ Avval akkauntga kiring!", show_alert=True)
+    # 2) Qisqa e'lon ID (short_id) bo'yicha qidirish — trade/sotuv/online trader
+    qid = query.upper()
+    async for t in trades.find({"status": "active"}):
+        if short_id(t["_id"]) == qid:
+            found = True
+            await _send_trade_result(msg, t)
+    async for s in sales.find({"status": "active"}):
+        if short_id(s["_id"]) == qid:
+            found = True
+            await _send_sale_result(msg, s)
+
+    if not found:
+        await msg.answer("❌ Hech narsa topilmadi. Boshqa ID bilan urinib ko'ring.", reply_markup=main_kb())
         return
-    await cb.answer("⏳ Guruhlar yuklanmoqda...")
-    client = await _tl_get_client(uid)
-    if not client:
-        await ax_set(uid, session=None)
-        await cb.message.answer("❌ Session yaroqsiz. Qaytadan /start bosing va Autoxabar ni tanlang.")
-        return
-    try:
-        groups_list = []
-        async for dialog in client.iter_dialogs():
-            if dialog.is_group or dialog.is_channel:
-                groups_list.append({"id": dialog.id, "title": dialog.title or str(dialog.id)})
-        await client.disconnect()
-        await ax_set(uid, all_groups=groups_list)
-        selected = doc.get("groups", [])
-        if not groups_list:
-            await cb.message.answer("❌ Siz hech qanday guruh/kanalda yo'q ekansiz.")
-            return
-        await cb.message.edit_text(
-            f"👥 *Guruhlar va Kanallar*\n\n"
-            f"✅ tanlangan | ❌ tanlanmagan\n"
-            f"Jami: {len(groups_list)} ta | Tanlangan: {len(selected)} ta\n\n"
-            f"Xabar yuborilsin bo'lganini tanlang:",
-            reply_markup=ax_groups_kb(groups_list, selected)
-        )
-    except Exception as e:
-        await cb.message.answer(f"❌ Xato: {e}")
+    await msg.answer("✅ Qidiruv yakunlandi.", reply_markup=main_kb())
 
-@dp.callback_query(F.data.startswith("axgrp_"))
-async def ax_group_toggle(cb: types.CallbackQuery):
-    uid  = cb.from_user.id
-    raw  = cb.data[len("axgrp_"):]
-    gid  = int(raw.replace("n", "-")) if raw.startswith("n") else int(raw)
-    doc  = await ax_get(uid)
-    sel  = list(doc.get("groups", []))
-    if gid in sel:
-        sel.remove(gid)
-    else:
-        sel.append(gid)
-    await ax_set(uid, groups=sel)
-    doc        = await ax_get(uid)
-    all_groups = doc.get("all_groups", [])
-    selected   = doc.get("groups", [])
-    try:
-        await cb.message.edit_text(
-            f"👥 *Guruhlar va Kanallar*\n\n"
-            f"✅ tanlangan | ❌ tanlanmagan\n"
-            f"Jami: {len(all_groups)} ta | Tanlangan: {len(selected)} ta\n\n"
-            f"Xabar yuborilsin bo'lganini tanlang:",
-            reply_markup=ax_groups_kb(all_groups, selected)
-        )
-    except Exception:
-        pass
-    await cb.answer()
-
-@dp.callback_query(F.data == "ax_time")
-async def ax_time(cb: types.CallbackQuery):
-    uid = cb.from_user.id
-    doc = await ax_get(uid)
-    cur = doc.get("interval", 5)
-    await cb.message.edit_text(
-        f"⏱ *Vaqtni sozlash*\n\nHozirgi interval: *{cur} daqiqa*\n\nHar necha daqiqada yuborilsin?",
-        reply_markup=ax_time_kb(cur)
-    )
-    await cb.answer()
-
-@dp.callback_query(F.data.startswith("axtime_"))
-async def ax_time_set(cb: types.CallbackQuery, state: FSMContext):
-    uid = cb.from_user.id
-    val = cb.data.split("_")[1]
-    if val == "custom":
-        await cb.message.answer("🔢 1 dan 1000 gacha daqiqa kiriting:", reply_markup=cancel_kb())
-        await state.set_state(AutoxabarFlow.confirm_edit)
-        await cb.answer()
-        return
-    minutes = int(val)
-    await ax_set(uid, interval=minutes)
-    doc = await ax_get(uid)
-    cur = doc.get("interval", 5)
-    try:
-        await cb.message.edit_text(
-            f"⏱ *Vaqtni sozlash*\n\nHozirgi interval: *{cur} daqiqa*\n\nHar necha daqiqada yuborilsin?",
-            reply_markup=ax_time_kb(cur)
-        )
-    except Exception:
-        pass
-    await cb.answer(f"✅ {minutes} daqiqaga o'rnatildi!")
-
-@dp.message(AutoxabarFlow.confirm_edit)
-async def ax_custom_time(msg: types.Message, state: FSMContext):
+@dp.message(SearchFlow.by_name)
+async def search_by_name_handler(msg: types.Message, state: FSMContext):
     if msg.text == "❌ Bekor qilish":
         await state.clear()
         await msg.answer("Bekor qilindi.", reply_markup=main_kb())
         return
-    txt = msg.text.strip()
-    if not txt.isdigit() or not (1 <= int(txt) <= 1000):
-        await msg.answer("❌ 1 dan 1000 gacha son kiriting:")
-        return
-    uid     = msg.from_user.id
-    minutes = int(txt)
-    await ax_set(uid, interval=minutes)
+    query = msg.text.strip().lstrip("@")
     await state.clear()
-    b = InlineKeyboardBuilder()
-    b.button(text="🔙 Orqaga", callback_data="ax_back")
-    await msg.answer(f"✅ Interval *{minutes} daqiqa* ga o'rnatildi!", reply_markup=b.as_markup())
+    if len(query) < 2:
+        await msg.answer("❌ Kamida 2 ta belgi kiriting:", reply_markup=main_kb())
+        return
+
+    import re as _re
+    pattern = _re.compile(_re.escape(query), _re.IGNORECASE)
+    found = False
+
+    trade_matches = [t async for t in trades.find({"status": "active", "name": {"$regex": pattern}}).limit(10)]
+    for t in trade_matches:
+        found = True
+        await _send_trade_result(msg, t)
+
+    sale_matches = [s async for s in sales.find({"status": "active", "name": {"$regex": pattern}}).limit(10)]
+    for s in sale_matches:
+        found = True
+        await _send_sale_result(msg, s)
+
+    ot_matches = [t async for t in online_traders.find({
+        "$or": [
+            {"roblox_nick": {"$regex": pattern}},
+            {"username":    {"$regex": pattern}},
+        ]
+    }).limit(10)]
+    for t in ot_matches:
+        found = True
+        await _send_ot_result(msg, t)
+
+    if not found:
+        await msg.answer("❌ Hech narsa topilmadi. Boshqa nom bilan urinib ko'ring.", reply_markup=main_kb())
+        return
+    await msg.answer("✅ Qidiruv yakunlandi.", reply_markup=main_kb())
 
 # ═══════════════════════════════════════════════════════
 # ADMIN PANEL
