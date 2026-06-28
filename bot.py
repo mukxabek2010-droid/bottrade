@@ -897,7 +897,7 @@ async def buy_nick(msg: types.Message, state: FSMContext):
         await msg.answer("❌ Nik kamida 3 ta belgi bo'lsin, qaytadan kiriting:")
         return
     await state.update_data(buy_nick=nick)
-    await msg.answer("parolingiz?", reply_markup=cancel_kb())
+    await msg.answer("roblox parolingiz?", reply_markup=cancel_kb())
     await state.set_state(BuyFlow.mood)
 
 @dp.message(BuyFlow.mood)
@@ -968,7 +968,7 @@ async def cb_buy_confirm(cb: types.CallbackQuery, state: FSMContext):
         f"💵 To'langan: *{price:,} so'm*\n"
         f"🎮 Nik: `{esc_md(nick)}`\n"
         f"📋 Buyurtma #{short_id(oid)}\n\n"
-        f"😴 Admin tasdiqlagunicha kutib turing.",
+        f"😴 Admin tasdiqlagunicha 2 step ochirib qoyib kutib turing.",
         reply_markup=main_kb()
     )
     await cb.answer()
