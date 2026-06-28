@@ -2174,18 +2174,21 @@ WEBHOOK_URL  = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
 WEB_PORT     = int(os.getenv("PORT", 10000))           # Render PORT env beradi
 
 
-async def on_startup(app: web.Application):
+async def on_startup(bot: Bot):
     await init_indexes()
     await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
     logging.info(f"✅ Webhook o'rnatildi: {WEBHOOK_URL}")
 
 
-async def on_shutdown(app: web.Application):
+async def on_shutdown(bot: Bot):
     await bot.delete_webhook()
     logging.info("🔴 Webhook o'chirildi.")
 
 
 def main():
+    dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
+
     app = web.Application()
 
     # Health-check endpoint — Render shu URL ni so'raydi
@@ -2197,9 +2200,6 @@ def main():
     # aiogram webhook handler
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
-
-    app.on_startup.append(on_startup)
-    app.on_shutdown.append(on_shutdown)
 
     logging.info(f"🚀 Server port {WEB_PORT} da ishga tushdi")
     web.run_app(app, host="0.0.0.0", port=WEB_PORT)
