@@ -12,6 +12,8 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from aiogram.client.default import DefaultBotProperties
+from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+from aiohttp import web
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -2164,12 +2166,44 @@ async def bc_text(msg: types.Message, state: FSMContext):
     await msg.answer(f"✅ Xabar *{sent}/{len(uids)}* ta foydalanuvchiga yuborildi!", reply_markup=main_kb())
 
 # ═══════════════════════════════════════════════════════
-# MAIN
+# WEBHOOK (Render Web Service uchun)
 # ═══════════════════════════════════════════════════════
-async def main():
+WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL", "")   # Render avtomatik beradi
+WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
+WEBHOOK_URL  = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
+WEB_PORT     = int(os.getenv("PORT", 10000))           # Render PORT env beradi
+
+
+async def on_startup(app: web.Application):
     await init_indexes()
-    logging.info("✅ Bot ishga tushdi!")
-    await dp.start_polling(bot, drop_pending_updates=True)
+    await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
+    logging.info(f"✅ Webhook o'rnatildi: {WEBHOOK_URL}")
+
+
+async def on_shutdown(app: web.Application):
+    await bot.delete_webhook()
+    logging.info("🔴 Webhook o'chirildi.")
+
+
+def main():
+    app = web.Application()
+
+    # Health-check endpoint — Render shu URL ni so'raydi
+    async def health(request):
+        return web.Response(text="OK")
+
+    app.router.add_get("/", health)
+
+    # aiogram webhook handler
+    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
+    setup_application(app, dp, bot=bot)
+
+    app.on_startup.append(on_startup)
+    app.on_shutdown.append(on_shutdown)
+
+    logging.info(f"🚀 Server port {WEB_PORT} da ishga tushdi")
+    web.run_app(app, host="0.0.0.0", port=WEB_PORT)
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
