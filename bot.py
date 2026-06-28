@@ -22,7 +22,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 # CONFIG
 # ═══════════════════════════════════════════════════════
 BOT_TOKEN        = os.getenv("BOT_TOKEN")
-ADMIN_ID         = int(os.getenv("ADMIN_ID", "0"))
+ADMIN_ID         = int(os.getenv("8667862086", "0"))
 MONGO_URI        = os.getenv("MONGO_URI")
 REQUIRED_CHANNEL  = os.getenv("CHANNEL", "@bulldrop_n1")
 REQUIRED_CHANNEL2 = os.getenv("CHANNEL2", "@uzbekroblox")
