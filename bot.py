@@ -2506,7 +2506,7 @@ async def cmd_autoxabar(msg: types.Message, state: FSMContext):
             f"Matn: {(d.get('ad_text') or 'Kiritilmagan')[:40]}\n"
             f"Rasm: {'✅ Bor' if d.get('ad_photo') else '❌ Yo\\'q'}\n"
             f"Guruhlar: {len(d.get('selected_groups', []))} ta tanlangan\n"
-            f"Interval: {d.get('interval_minutes', 5)} daqiqa",
+            f'Interval: {d.get("interval_minutes", 5)} daqiqa'
             reply_markup=ax_main_kb()
         )
     else:
