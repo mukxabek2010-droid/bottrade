@@ -353,16 +353,16 @@ def skip_cancel_kb():
 async def is_sub(uid: int) -> bool:
     try:
         m1 = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=uid)
-        ok1 = m1.status in ["creator", "administrator", "member"]
+        ok1 = m1.status not in ["left", "kicked", "banned"]
     except Exception as e:
         logging.error(f"Sub check xato (1-kanal): {e}")
-        ok1 = False
+        ok1 = True   # xato bo'lsa o'tkazib yubor
     try:
         m2 = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL2, user_id=uid)
-        ok2 = m2.status in ["creator", "administrator", "member"]
+        ok2 = m2.status not in ["left", "kicked", "banned"]
     except Exception as e:
         logging.error(f"Sub check xato (2-kanal): {e}")
-        ok2 = False
+        ok2 = True   # xato bo'lsa o'tkazib yubor
     return ok1 and ok2
 
 async def check_access(msg: types.Message, state: FSMContext) -> bool:
