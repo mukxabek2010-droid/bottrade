@@ -28,7 +28,7 @@ REQUIRED_CHANNELS = ["@bulldrop_n1", "@uzbekroblox", "@trade_chanel_uz"]
 TRADE_CHANNEL     = "@trade_chanel_uz"   # e'lonlar yuboriladigan kanal
 CARD_NUMBER       = os.getenv("CARD_NUMBER", "5614682091344749")   # tire YO'Q
 CARD_OWNER        = os.getenv("CARD_OWNER", "Nurboyev.N")
-CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_uz")
+CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_chat_veko")
 
 # 2 ta admin ID
 ADMIN_IDS = {8325726426, 8667862086}
