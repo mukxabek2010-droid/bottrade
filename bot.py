@@ -62,6 +62,7 @@ ads            = mdb["ads"]
 cooldowns      = mdb["cooldowns"]
 autoxabar_db   = mdb["autoxabar"]
 online_traders = mdb["online_traders"]   # yangi kolleksiya
+mutes_db       = mdb["mutes"]               # mute tizimi
 trade_cart     = mdb["trade_cart"]       # savat — tradelar
 sale_cart      = mdb["sale_cart"]        # savat — sotuvlar
 
@@ -75,6 +76,7 @@ async def init_indexes():
     await ads.create_index("user_id")
     await cooldowns.create_index([("user_id", 1), ("action", 1)], unique=True)
     await online_traders.create_index("user_id", unique=True)
+    await mutes_db.create_index("user_id", unique=True)
 
 # ═══════════════════════════════════════════════════════
 # HELPERS
@@ -485,6 +487,11 @@ async def is_sub(uid: int) -> bool:
 
 async def check_access(msg: types.Message, state: FSMContext) -> bool:
     uid = msg.from_user.id
+    # Mute tekshiruvi
+    if not is_admin(uid) and await is_muted(uid):
+        rem = await mute_remaining(uid)
+        await msg.answer(f"🔇 Siz mute oldingiz! {rem} vaqt qoldi.")
+        return False
     missing = await not_subscribed_channels(uid)
     if missing:
         await msg.answer(
@@ -2172,6 +2179,50 @@ async def search_by_name_handler(msg: types.Message, state: FSMContext):
     await msg.answer("✅ Qidiruv yakunlandi.", reply_markup=main_kb())
 
 # ═══════════════════════════════════════════════════════
+# MUTE TIZIMI
+# ═══════════════════════════════════════════════════════
+async def mute_user(uid: int, until_ts: float, reason: str = ""):
+    await mutes_db.update_one(
+        {"user_id": uid},
+        {"$set": {"user_id": uid, "until": until_ts, "reason": reason, "muted_at": now()}},
+        upsert=True
+    )
+
+async def unmute_user(uid: int):
+    await mutes_db.delete_one({"user_id": uid})
+
+async def is_muted(uid: int) -> bool:
+    from datetime import datetime as dt
+    rec = await mutes_db.find_one({"user_id": uid})
+    if not rec:
+        return False
+    if rec["until"] < dt.now().timestamp():
+        await mutes_db.delete_one({"user_id": uid})
+        return False
+    return True
+
+async def mute_remaining(uid: int) -> str:
+    from datetime import datetime as dt
+    rec = await mutes_db.find_one({"user_id": uid})
+    if not rec:
+        return "0"
+    remaining = max(0, rec["until"] - dt.now().timestamp())
+    h = int(remaining // 3600)
+    m = int((remaining % 3600) // 60)
+    s = int(remaining % 60)
+    if h > 0:
+        return f"{h} soat {m} daqiqa"
+    elif m > 0:
+        return f"{m} daqiqa {s} soniya"
+    return f"{s} soniya"
+
+# Mute states
+class MuteFlow(StatesGroup):
+    user_id  = State()
+    duration = State()
+    unit     = State()
+
+# ═══════════════════════════════════════════════════════
 # ADMIN PANEL
 # ═══════════════════════════════════════════════════════
 @dp.message(Command("admin"))
@@ -2189,7 +2240,9 @@ async def cmd_admin(msg: types.Message):
     b.button(text=f"🛍 Sotuvlar ({len(sl)})",      callback_data="adm_sl")
     b.button(text="📢 Broadcast",                  callback_data="adm_bc")
     b.button(text="➕ Balans qo'shish",            callback_data="adm_addbal")
-    b.adjust(2, 2, 1)
+    b.button(text="🔇 Mute berish",                callback_data="adm_mute")
+    b.button(text="👥 Foydalanuvchilar",           callback_data="adm_users_0")
+    b.adjust(2, 2, 2, 1)
     await msg.answer(
         f"🛠 *Admin Panel*\n\n👥 Foydalanuvchilar: *{cnt}*\n"
         f"📦 Kutayotgan buyurtmalar: *{len(or_)}*\n"
@@ -2351,6 +2404,308 @@ async def bc_text(msg: types.Message, state: FSMContext):
         await asyncio.sleep(0.05)
     await msg.answer(f"✅ Xabar *{sent}/{len(uids)}* ta foydalanuvchiga yuborildi!", reply_markup=main_kb())
 
+
+# ═══════════════════════════════════════════════════════
+# MUTE HANDLERS
+# ═══════════════════════════════════════════════════════
+@dp.callback_query(F.data == "adm_mute")
+async def adm_mute(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    await cb.message.answer(
+        "🔇 *Mute berish*\n\n"
+        "Foydalanuvchi ID sini kiriting:\n"
+        "_(masalan: 123456789)_",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(MuteFlow.user_id)
+    await cb.answer()
+
+@dp.message(MuteFlow.user_id)
+async def mute_get_user_id(msg: types.Message, state: FSMContext):
+    if msg.text == "❌ Bekor qilish":
+        await state.clear()
+        await msg.answer("Bekor qilindi.", reply_markup=main_kb())
+        return
+    txt = msg.text.strip()
+    if not txt.isdigit():
+        await msg.answer("❌ Faqat raqam (Telegram ID) kiriting:")
+        return
+    uid_target = int(txt)
+    u = await get_user(uid_target)
+    if not u:
+        await msg.answer("❌ Bunday foydalanuvchi topilmadi. ID ni tekshiring.")
+        return
+    await state.update_data(mute_target_id=uid_target, mute_target_name=u.get("username", str(uid_target)))
+    await msg.answer(
+        f"✅ Foydalanuvchi: @{u.get('username', '-')} (`{uid_target}`)\n\n"
+        "⏱ Necha vaqtga mute bermoqchisiz? (faqat raqam):",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(MuteFlow.duration)
+
+@dp.message(MuteFlow.duration)
+async def mute_get_duration(msg: types.Message, state: FSMContext):
+    if msg.text == "❌ Bekor qilish":
+        await state.clear()
+        await msg.answer("Bekor qilindi.", reply_markup=main_kb())
+        return
+    txt = msg.text.strip()
+    if not txt.isdigit() or int(txt) <= 0:
+        await msg.answer("❌ Musbat raqam kiriting:")
+        return
+    await state.update_data(mute_duration=int(txt))
+    b = InlineKeyboardBuilder()
+    b.button(text="⏱ Daqiqa", callback_data="mute_unit_min")
+    b.button(text="🕐 Soat",   callback_data="mute_unit_hour")
+    b.button(text="📅 Kun",    callback_data="mute_unit_day")
+    b.adjust(3)
+    await msg.answer("📏 Vaqt birligini tanlang:", reply_markup=b.as_markup())
+    await state.set_state(MuteFlow.unit)
+
+@dp.callback_query(F.data.startswith("mute_unit_"))
+async def mute_set_unit(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    unit_map = {"mute_unit_min": ("daqiqa", 60), "mute_unit_hour": ("soat", 3600), "mute_unit_day": ("kun", 86400)}
+    unit_label, multiplier = unit_map[cb.data]
+    d = await state.get_data()
+    duration = d.get("mute_duration", 0)
+    target_id = d.get("mute_target_id")
+    target_name = d.get("mute_target_name", str(target_id))
+
+    from datetime import datetime as dt
+    until_ts = dt.now().timestamp() + duration * multiplier
+
+    await mute_user(target_id, until_ts, reason=f"Admin tomonidan mute: {duration} {unit_label}")
+    await state.clear()
+
+    try:
+        await bot.send_message(
+            target_id,
+            f"🔇 Siz {duration} {unit_label}ga *mute* oldingiz.\n"
+            f"Bu vaqt ichida botdan foydalana olmaysiz."
+        )
+    except Exception:
+        pass
+
+    await cb.message.answer(
+        f"✅ @{target_name} (`{target_id}`) foydalanuvchiga\n"
+        f"⏱ {duration} {unit_label}ga mute berildi!",
+        reply_markup=main_kb()
+    )
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("adm_unmute_"))
+async def adm_unmute(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    uid_target = int(cb.data.split("_")[2])
+    await unmute_user(uid_target)
+    try:
+        await bot.send_message(uid_target, "✅ Mutingiz olib tashlandi! Botdan foydalanishingiz mumkin.")
+    except Exception:
+        pass
+    try:
+        await cb.message.edit_text(cb.message.text + "\n\n✅ MUTE OLIB TASHLANDI")
+    except Exception:
+        pass
+    await cb.answer("✅ Mute olib tashlandi!")
+
+# ─── /mute va /unmute komandalari ──────────────────────
+@dp.message(Command("mute"))
+async def cmd_mute(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer("❌ Ruxsat yo'q!")
+        return
+    parts = msg.text.split()
+    if len(parts) < 3:
+        await msg.answer("❌ Format: /mute <user_id> <daqiqa>\nMasalan: /mute 123456789 30")
+        return
+    if not parts[1].isdigit() or not parts[2].isdigit():
+        await msg.answer("❌ user_id va daqiqa raqam bo'lishi kerak!")
+        return
+    uid_target = int(parts[1])
+    minutes = int(parts[2])
+    from datetime import datetime as dt
+    until_ts = dt.now().timestamp() + minutes * 60
+    await mute_user(uid_target, until_ts)
+    try:
+        await bot.send_message(uid_target, f"🔇 Siz {minutes} daqiqaga *mute* oldingiz.")
+    except Exception:
+        pass
+    await msg.answer(f"✅ {uid_target} foydalanuvchiga {minutes} daqiqa mute berildi.")
+
+@dp.message(Command("unmute"))
+async def cmd_unmute(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer("❌ Ruxsat yo'q!")
+        return
+    parts = msg.text.split()
+    if len(parts) < 2 or not parts[1].isdigit():
+        await msg.answer("❌ Format: /unmute <user_id>")
+        return
+    uid_target = int(parts[1])
+    await unmute_user(uid_target)
+    try:
+        await bot.send_message(uid_target, "✅ Mutingiz olib tashlandi!")
+    except Exception:
+        pass
+    await msg.answer(f"✅ {uid_target} foydalanuvchining mutesi olib tashlandi.")
+
+# ═══════════════════════════════════════════════════════
+# FOYDALANUVCHILAR BO'LIMI (Admin Panel)
+# ═══════════════════════════════════════════════════════
+USERS_PER_PAGE = 10
+
+@dp.callback_query(F.data.startswith("adm_users_"))
+async def adm_users(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    page = int(cb.data.split("_")[2])
+    total = await users.count_documents({})
+    skip = page * USERS_PER_PAGE
+    user_list = [u async for u in users.find({}).sort("_id", -1).skip(skip).limit(USERS_PER_PAGE)]
+
+    if not user_list:
+        await cb.answer("Foydalanuvchilar yo'q!", show_alert=True)
+        return
+
+    text = f"👥 *Foydalanuvchilar* [{page * USERS_PER_PAGE + 1}–{min((page+1) * USERS_PER_PAGE, total)}/{total}]\n\n"
+    b = InlineKeyboardBuilder()
+
+    for u in user_list:
+        uid_u = u["user_id"]
+        uname = u.get("username") or "-"
+        bal   = u.get("balance", 0)
+        muted = await is_muted(uid_u)
+        mute_icon = "🔇" if muted else "🔊"
+        text += f"{mute_icon} `{uid_u}` | @{esc_md(uname)} | {bal:,} so'm\n"
+        b.button(text=f"{mute_icon} {uid_u}", callback_data=f"adm_user_{uid_u}")
+
+    b.adjust(2)
+
+    nav = InlineKeyboardBuilder()
+    if page > 0:
+        nav.button(text="⬅️ Oldingi", callback_data=f"adm_users_{page-1}")
+    if (page + 1) * USERS_PER_PAGE < total:
+        nav.button(text="➡️ Keyingi", callback_data=f"adm_users_{page+1}")
+    nav.button(text="🔙 Admin panel", callback_data="adm_back")
+    nav.adjust(2, 1)
+
+    # Combine keyboards
+    combined = InlineKeyboardBuilder()
+    for row in b.as_markup().inline_keyboard:
+        combined.row(*[btn for btn in row])
+    for row in nav.as_markup().inline_keyboard:
+        combined.row(*[btn for btn in row])
+
+    try:
+        await cb.message.edit_text(text, reply_markup=combined.as_markup())
+    except Exception:
+        await cb.message.answer(text, reply_markup=combined.as_markup())
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("adm_user_"))
+async def adm_user_detail(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    uid_target = int(cb.data.split("_")[2])
+    u = await get_user(uid_target)
+    if not u:
+        await cb.answer("Foydalanuvchi topilmadi!", show_alert=True)
+        return
+    muted = await is_muted(uid_target)
+    mute_rem = await mute_remaining(uid_target) if muted else "-"
+    tr_count = len(await my_trades(uid_target))
+    sl_count = len(await my_sales(uid_target))
+
+    text = (
+        f"👤 *Foydalanuvchi ma'lumotlari*\n\n"
+        f"🆔 ID: `{uid_target}`\n"
+        f"📛 Username: @{esc_md(u.get('username', '-'))}\n"
+        f"💰 Balans: *{u.get('balance', 0):,} so'm*\n"
+        f"📈 Jami kiritilgan: *{u.get('total_deposited', 0):,} so'm*\n"
+        f"📅 Ro'yxat: {u.get('joined', '-')}\n"
+        f"🔄 Faol tradelari: {tr_count}\n"
+        f"🛍 Faol sotuvlari: {sl_count}\n"
+        f"🔇 Mute: {'✅ Ha (' + mute_rem + ' qoldi)' if muted else '❌ Yoq'}"
+    )
+    b = InlineKeyboardBuilder()
+    if muted:
+        b.button(text="🔊 Mute olib tashlash", callback_data=f"adm_unmute_{uid_target}")
+    else:
+        b.button(text="🔇 Mute berish", callback_data=f"adm_mute_user_{uid_target}")
+    b.button(text="💰 Balans qo'shish", callback_data=f"adm_bal_{uid_target}")
+    b.button(text="🔙 Orqaga", callback_data="adm_users_0")
+    b.adjust(1)
+    try:
+        await cb.message.edit_text(text, reply_markup=b.as_markup())
+    except Exception:
+        await cb.message.answer(text, reply_markup=b.as_markup())
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("adm_mute_user_"))
+async def adm_mute_user_quick(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    uid_target = int(cb.data.split("_")[3])
+    u = await get_user(uid_target)
+    target_name = u.get("username", str(uid_target)) if u else str(uid_target)
+    await state.update_data(mute_target_id=uid_target, mute_target_name=target_name)
+    await cb.message.answer(
+        f"🔇 @{target_name} uchun mute vaqtini kiriting (faqat raqam, daqiqada):\n"
+        "_(masalan: 30 → 30 daqiqa, 60 → 1 soat)_\n\n"
+        "Yoki qo'lda birlik tanlash uchun:",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(MuteFlow.duration)
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("adm_bal_"))
+async def adm_bal_quick(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    uid_target = int(cb.data.split("_")[2])
+    await state.update_data(quick_bal_uid=uid_target)
+    await cb.message.answer(
+        f"💰 {uid_target} foydalanuvchiga necha so'm qo'shish?\n_(raqam kiriting)_:",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(AdminCmd.add_balance)
+    await cb.answer()
+
+@dp.callback_query(F.data == "adm_back")
+async def adm_back(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    tr  = await active_trades()
+    sl  = await active_sales()
+    or_ = await pending_orders()
+    cnt = await users_count()
+    b   = InlineKeyboardBuilder()
+    b.button(text=f"📦 Buyurtmalar ({len(or_)})", callback_data="adm_ord")
+    b.button(text=f"🔄 Tradelar ({len(tr)})",     callback_data="adm_tr")
+    b.button(text=f"🛍 Sotuvlar ({len(sl)})",      callback_data="adm_sl")
+    b.button(text="📢 Broadcast",                  callback_data="adm_bc")
+    b.button(text="➕ Balans qo'shish",            callback_data="adm_addbal")
+    b.button(text="🔇 Mute berish",                callback_data="adm_mute")
+    b.button(text="👥 Foydalanuvchilar",           callback_data="adm_users_0")
+    b.adjust(2, 2, 2, 1)
+    try:
+        await cb.message.edit_text(
+            f"🛠 *Admin Panel*\n\n👥 Foydalanuvchilar: *{cnt}*\n"
+            f"📦 Kutayotgan buyurtmalar: *{len(or_)}*\n"
+            f"🔄 Faol tradelar: *{len(tr)}*\n🛍 Faol sotuvlar: *{len(sl)}*",
+            reply_markup=b.as_markup()
+        )
+    except Exception:
+        await cb.message.answer(
+            f"🛠 *Admin Panel*\n\n👥 Foydalanuvchilar: *{cnt}*",
+            reply_markup=b.as_markup()
+        )
+    await cb.answer()
+
 # ═══════════════════════════════════════════════════════
 # AUTOXABAR BO'LIMI  (Telethon userbot)
 # ═══════════════════════════════════════════════════════
@@ -2500,13 +2855,16 @@ async def cmd_autoxabar(msg: types.Message, state: FSMContext):
             d["logged_in"] = True
             await ax_save(uid, d)
         st = "🟢 Yoqiq" if d.get("auto_active") else "🔴 O'chiq"
+        _rasm = "✅ Bor" if d.get("ad_photo") else "❌ Yoq"
+        _interval = d.get("interval_minutes", 5)
+        _matn = (d.get("ad_text") or "Kiritilmagan")[:40]
         await msg.answer(
             f"📢 *Autoxabar paneli*\n\n"
             f"Holat: {st}\n"
-            f"Matn: {(d.get('ad_text') or 'Kiritilmagan')[:40]}\n"
-            f"Rasm: {'✅ Bor' if d.get('ad_photo') else '❌ Yo\\'q'}\n"
+            f"Matn: {_matn}\n"
+            f"Rasm: {_rasm}\n"
             f"Guruhlar: {len(d.get('selected_groups', []))} ta tanlangan\n"
-            f'Interval: {d.get("interval_minutes", 5)} daqiqa'
+            f"Interval: {_interval} daqiqa",
             reply_markup=ax_main_kb()
         )
     else:
@@ -2615,13 +2973,16 @@ async def ax_cb_main(cb: types.CallbackQuery):
     uid = cb.from_user.id
     d   = await ax_get(uid)
     st  = "🟢 Yoqiq" if d.get("auto_active") else "🔴 O'chiq"
+    _rasm2 = "✅ Bor" if d.get("ad_photo") else "❌ Yoq"
+    _interval2 = d.get("interval_minutes", 5)
+    _matn2 = (d.get("ad_text") or "Kiritilmagan")[:40]
     await cb.message.edit_text(
         f"📢 *Autoxabar paneli*\n\n"
         f"Holat: {st}\n"
-        f"Matn: {(d.get('ad_text') or 'Kiritilmagan')[:40]}\n"
-        f"Rasm: {'✅ Bor' if d.get('ad_photo') else '❌ Yo\\'q'}\n"
+        f"Matn: {_matn2}\n"
+        f"Rasm: {_rasm2}\n"
         f"Guruhlar: {len(d.get('selected_groups', []))} ta tanlangan\n"
-        f"Interval: {d.get('interval_minutes', 5)} daqiqa",
+        f"Interval: {_interval2} daqiqa",
         reply_markup=ax_main_kb()
     )
     await cb.answer()
