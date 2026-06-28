@@ -23,8 +23,8 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 # ═══════════════════════════════════════════════════════
 BOT_TOKEN         = os.getenv("BOT_TOKEN")
 MONGO_URI         = os.getenv("MONGO_URI")
-REQUIRED_CHANNEL  = os.getenv("CHANNEL", "@bulldrop_n1")
-REQUIRED_CHANNEL2 = os.getenv("CHANNEL2", "@uzbekroblox")
+REQUIRED_CHANNEL  = os.getenv("CHANNEL", "@trade_chanel_uz")
+TRADE_CHANNEL     = "@trade_chanel_uz"   # e'lonlar yuboriladigan kanal
 CARD_NUMBER       = os.getenv("CARD_NUMBER", "5614682091344749")   # tire YO'Q
 CARD_OWNER        = os.getenv("CARD_OWNER", "Nurboyev.N")
 CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_uz")
@@ -399,8 +399,7 @@ dp  = Dispatcher(storage=MemoryStorage())
 # ═══════════════════════════════════════════════════════
 def sub_kb():
     b = InlineKeyboardBuilder()
-    b.button(text="📢 1-kanalga obuna bo'lish", url=f"https://t.me/{REQUIRED_CHANNEL.lstrip('@')}")
-    b.button(text="📢 2-kanalga obuna bo'lish", url=f"https://t.me/{REQUIRED_CHANNEL2.lstrip('@')}")
+    b.button(text="📢 @trade_chanel_uz kanalga obuna bo'lish", url=f"https://t.me/trade_chanel_uz")
     b.button(text="✅ Obunani tasdiqlash", callback_data="check_sub")
     b.adjust(1)
     return b.as_markup()
@@ -445,20 +444,14 @@ async def is_sub(uid: int) -> bool:
         m1 = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL, user_id=uid)
         ok1 = m1.status not in ["left", "kicked", "banned"]
     except Exception as e:
-        logging.error(f"Sub check xato (1-kanal): {e}")
+        logging.error(f"Sub check xato: {e}")
         ok1 = True
-    try:
-        m2 = await bot.get_chat_member(chat_id=REQUIRED_CHANNEL2, user_id=uid)
-        ok2 = m2.status not in ["left", "kicked", "banned"]
-    except Exception as e:
-        logging.error(f"Sub check xato (2-kanal): {e}")
-        ok2 = True
-    return ok1 and ok2
+    return ok1
 
 async def check_access(msg: types.Message, state: FSMContext) -> bool:
     uid = msg.from_user.id
     if not await is_sub(uid):
-        await msg.answer("❌ Avval ikkala kanalga ham obuna bo'ling!", reply_markup=sub_kb())
+        await msg.answer("❌ Avval @trade_chanel_uz kanalga obuna bo'ling!", reply_markup=sub_kb())
         return False
     return True
 
@@ -497,13 +490,79 @@ async def notify_admins(text: str, photo_id=None, markup=None):
             logging.error(f"Admin {aid} ga xabar yuborishda xato: {e}")
 
 # ═══════════════════════════════════════════════════════
+# KANALGA E'LON YUBORISH
+# ═══════════════════════════════════════════════════════
+async def post_trade_to_channel(uname: str, item_name: str, bio: str, photo_id=None):
+    caption = (
+        "🔄 *YANGI TRADE E'LON*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"1️⃣ *Foydalanuvchi:* @{esc_md(uname)}\n\n"
+        f"2️⃣ *Buyum nomi:*\n{esc_md(item_name)}\n\n"
+        f"3️⃣ *Bio:*\n{esc_md(bio or '—')}\n\n"
+        "4️⃣ 🔄 *Trade*\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"💬 Murojaat: @{esc_md(uname)}"
+    )
+    b = InlineKeyboardBuilder()
+    b.button(text="💬 Murojaat", url=f"https://t.me/{uname}")
+    try:
+        if photo_id:
+            await bot.send_photo(TRADE_CHANNEL, photo_id, caption=caption, reply_markup=b.as_markup())
+        else:
+            await bot.send_message(TRADE_CHANNEL, caption, reply_markup=b.as_markup())
+    except Exception as e:
+        logging.error(f"Kanalga trade yuborishda xato: {e}")
+
+async def post_sale_to_channel(uname: str, item_name: str, bio: str, price, currency: str, photo_id=None):
+    caption = (
+        "🏷 *YANGI SOTUV E'LON*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"1️⃣ *Foydalanuvchi:* @{esc_md(uname)}\n\n"
+        f"2️⃣ *Buyum nomi:*\n{esc_md(item_name)}\n\n"
+        f"3️⃣ *Bio:*\n{esc_md(bio or '—')}\n\n"
+        f"4️⃣ 🏷 *Sotiladi* — {int(price):,} {esc_md(currency)}\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"💬 Murojaat: @{esc_md(uname)}"
+    )
+    b = InlineKeyboardBuilder()
+    b.button(text="💬 Murojaat", url=f"https://t.me/{uname}")
+    try:
+        if photo_id:
+            await bot.send_photo(TRADE_CHANNEL, photo_id, caption=caption, reply_markup=b.as_markup())
+        else:
+            await bot.send_message(TRADE_CHANNEL, caption, reply_markup=b.as_markup())
+    except Exception as e:
+        logging.error(f"Kanalga sotuv yuborishda xato: {e}")
+
+async def post_online_trader_to_channel(uname: str, nick: str, bio: str, photo_id=None):
+    caption = (
+        "🌐 *YANGI ONLINE TRADER*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"1️⃣ *Foydalanuvchi:* @{esc_md(uname)}\n\n"
+        f"2️⃣ *Roblox nik:*\n{esc_md(nick)}\n\n"
+        f"3️⃣ *Bio:*\n{esc_md(bio or '—')}\n\n"
+        "4️⃣ 🔄 *Trade*\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"💬 Murojaat: @{esc_md(uname)}"
+    )
+    b = InlineKeyboardBuilder()
+    b.button(text="💬 Trade qilish", url=f"https://t.me/{uname}")
+    try:
+        if photo_id:
+            await bot.send_photo(TRADE_CHANNEL, photo_id, caption=caption, reply_markup=b.as_markup())
+        else:
+            await bot.send_message(TRADE_CHANNEL, caption, reply_markup=b.as_markup())
+    except Exception as e:
+        logging.error(f"Kanalga online trader yuborishda xato: {e}")
+
+# ═══════════════════════════════════════════════════════
 # /START + OBUNA
 # ═══════════════════════════════════════════════════════
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message, state: FSMContext):
     uid = msg.from_user.id
     if not await is_sub(uid):
-        await msg.answer("👋 Salom! Botdan foydalanish uchun avval ikkala kanalimizga ham obuna bo'ling!", reply_markup=sub_kb())
+        await msg.answer("👋 Salom! Botdan foydalanish uchun avval @trade_chanel_uz kanalimizga obuna bo'ling!", reply_markup=sub_kb())
         return
     await upsert_user(uid, msg.from_user.username or "user")
     await msg.answer(
@@ -521,7 +580,7 @@ async def cmd_start(msg: types.Message, state: FSMContext):
 async def cb_check_sub(cb: types.CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     if not await is_sub(uid):
-        await cb.answer("❌ Hali ikkala kanalga ham obuna bo'lmagansiz!", show_alert=True)
+        await cb.answer("❌ Hali @trade_chanel_uz kanalga obuna bo'lmagansiz!", show_alert=True)
         return
     try:
         await cb.message.delete()
@@ -779,7 +838,7 @@ async def cmd_buy(msg: types.Message, state: FSMContext):
 async def cb_buy(cb: types.CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     if not await is_sub(uid):
-        await cb.answer("❌ Avval ikkala kanalga ham obuna bo'ling!", show_alert=True)
+        await cb.answer("❌ Avval @trade_chanel_uz kanalga obuna bo'ling!", show_alert=True)
         return
     u = await get_user(uid)
     if not u:
@@ -1031,6 +1090,7 @@ async def ta_bio(msg: types.Message, state: FSMContext):
     await state.clear()
     cap = f"🔄 Yangi trade #{short_id(tid)}\n👤 @{esc_md(uname)}\n📦 {esc_md(d['t_name'])}\n📝 {esc_md(bio or '-')}"
     await notify_admins(cap, photo_id=photo_id)
+    await post_trade_to_channel(uname, d["t_name"], bio, photo_id)
     await msg.answer(f"✅ Trade e'lon qilindi! *#{short_id(tid)}*", reply_markup=main_kb())
 
 @dp.callback_query(F.data.startswith("etrade_"))
@@ -1226,6 +1286,7 @@ async def sa_price(msg: types.Message, state: FSMContext):
     await state.clear()
     cap = f"🛍 Yangi sotuv #{short_id(sid)}\n👤 @{esc_md(uname)}\n📦 {esc_md(d['s_name'])}\n📝 {esc_md(bio or '-')}\n💰 {int(txt):,} {d['s_currency']}"
     await notify_admins(cap, photo_id=d.get("s_photo"))
+    await post_sale_to_channel(uname, d["s_name"], bio, int(txt), d["s_currency"], d.get("s_photo"))
     await msg.answer(
         f"✅ Sotuv e'lon qilindi! *#{short_id(sid)}*\n📦 {d['s_name']}\n💰 {int(txt):,} {d['s_currency']}",
         reply_markup=main_kb()
@@ -1473,6 +1534,7 @@ async def ot_add_bio(msg: types.Message, state: FSMContext):
     uid    = msg.from_user.id
     uname  = msg.from_user.username or "user"
     await upsert_online_trader(uid, uname, d["ot_nick"], msg.text.strip(), d.get("ot_photo"))
+    await post_online_trader_to_channel(uname, d["ot_nick"], msg.text.strip(), d.get("ot_photo"))
     await state.clear()
     await msg.answer(
         "✅ *Siz Online Traderlar ro'yxatiga qo'shildingiz!*\n\n"
