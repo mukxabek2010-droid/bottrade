@@ -26,8 +26,8 @@ ADMIN_ID         = int(os.getenv("ADMIN_ID", "0"))
 MONGO_URI        = os.getenv("MONGO_URI")
 REQUIRED_CHANNEL  = os.getenv("CHANNEL", "@bulldrop_n1")
 REQUIRED_CHANNEL2 = os.getenv("CHANNEL2", "@uzbekroblox")
-CARD_NUMBER      = os.getenv("CARD_NUMBER", "9860 1234 5678 9012")
-CARD_OWNER       = os.getenv("CARD_OWNER", "ADMIN NOMI")
+CARD_NUMBER      = os.getenv("CARD_NUMBER", "5614-6820-9134-4749")
+CARD_OWNER       = os.getenv("CARD_OWNER", "Nurboyev.N")
 CHAT_LINK        = os.getenv("CHAT_LINK", "https://t.me/roblox_uz")
 
 # ═══════════════════════════════════════════════════════
