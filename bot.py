@@ -1,4 +1,3 @@
-cat > /home/claude/bot_new.py << 'ENDOFFILE'
 import os
 import asyncio
 import logging
@@ -711,7 +710,11 @@ async def _send_or_edit(cb: types.CallbackQuery, photo_id, text, markup):
     try:
         if photo_id:
             if cb.message.photo:
-                await cb.message.edit_caption(caption=text, reply_markup=markup)
+                # Rasmli xabarda rasm file_id ni tekshirish kerak emas — caption + markup yangilanadi
+                # Lekin rasm o'zgargan bo'lsa (boshqa e'lon) delete + resend kerak
+                # Har doim delete + resend qilamiz rasm uchun (eng ishonchli usul)
+                await cb.message.delete()
+                await cb.message.answer_photo(photo_id, caption=text, reply_markup=markup)
             else:
                 await cb.message.delete()
                 await cb.message.answer_photo(photo_id, caption=text, reply_markup=markup)
@@ -1488,8 +1491,11 @@ async def etrade_no_photo(msg: types.Message, state: FSMContext):
         await state.clear()
         await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
-    # skip => rasm o'zgarmaydi
-    if msg.text != T(lang, "skip"):
+    if msg.text == T(lang, "skip"):
+        # Rasm o'zgarmaydi — "SKIP" sentinel qo'yamiz
+        await state.update_data(new_photo="SKIP")
+    else:
+        # Rasm olib tashlansin (matn yuborildi)
         await state.update_data(new_photo=None)
     await msg.answer("📝 Yangi bio yozing:", reply_markup=cancel_kb(lang))
     await state.set_state(TradeEdit.bio)
@@ -1503,8 +1509,19 @@ async def etrade_bio(msg: types.Message, state: FSMContext):
         await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
     d = await state.get_data()
-    photo = d.get("new_photo")  # None = o'zgarmaydi, "" = olib tashlash
-    await edit_trade(d["edit_trade_id"], d["new_name"], msg.text.strip(), photo_id=photo)
+    photo_raw = d.get("new_photo")
+    # "SKIP" => rasm o'zgarmaydi (None uzatamiz, lekin edit_trade uni o'zgartirmaydi)
+    if photo_raw == "SKIP":
+        photo = "KEEP"  # DB da o'zgartirmaslik uchun
+    else:
+        photo = photo_raw  # None => o'chirish, file_id => yangilash
+    tid = d["edit_trade_id"]
+    # DB update
+    upd = {"$set": {"name": d["new_name"], "bio": msg.text.strip()}}
+    if photo != "KEEP":
+        upd["$set"]["photo_id"] = photo
+    from bson import ObjectId as ObjId
+    await trades.update_one({"_id": ObjId(str(tid))}, upd)
     await state.clear()
     await msg.answer("✅ Trade yangilandi!", reply_markup=main_kb(lang))
 
@@ -1740,7 +1757,10 @@ async def esale_no_photo(msg: types.Message, state: FSMContext):
         await state.clear()
         await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
-    # skip => rasm o'zgarmaydi
+    if msg.text == T(lang, "skip"):
+        await state.update_data(new_photo="SKIP")
+    else:
+        await state.update_data(new_photo=None)
     await msg.answer("💰 Yangi narx (raqam):", reply_markup=cancel_kb(lang))
     await state.set_state(SaleEdit.price)
 
@@ -1757,8 +1777,13 @@ async def esale_price(msg: types.Message, state: FSMContext):
         await msg.answer("❌ Faqat raqam:")
         return
     d = await state.get_data()
-    photo = d.get("new_photo")
-    await edit_sale(d["edit_sale_id"], d["new_name"], int(txt), photo_id=photo)
+    photo_raw = d.get("new_photo")
+    sid = d["edit_sale_id"]
+    from bson import ObjectId as ObjId
+    upd = {"$set": {"name": d["new_name"], "price": int(txt)}}
+    if photo_raw != "SKIP":
+        upd["$set"]["photo_id"] = photo_raw  # None = o'chirish, file_id = yangilash
+    await sales.update_one({"_id": ObjId(str(sid))}, upd)
     await state.clear()
     await msg.answer("✅ Sotuv yangilandi!", reply_markup=main_kb(lang))
 
@@ -2637,10 +2662,10 @@ async def adm_addbal(cb: types.CallbackQuery, state: FSMContext):
 
 @dp.message(AdminCmd.add_balance)
 async def admin_addbalance(msg: types.Message, state: FSMContext):
-    if msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel") or msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
         await state.clear()
-        uid  = msg.from_user.id
-        lang = await get_user_lang(uid)
         await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
     parts = msg.text.strip().split()
@@ -2693,19 +2718,23 @@ async def bc_photo(msg: types.Message, state: FSMContext):
 
 @dp.message(Broadcast.photo)
 async def bc_no_photo(msg: types.Message, state: FSMContext):
-    if msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
+    uid = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel") or msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
         await state.clear()
-        await msg.answer("Bekor qilindi.", reply_markup=main_kb())
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
     await state.update_data(bc_photo=None)
-    await msg.answer("📝 Xabar matnini yozing:", reply_markup=cancel_kb())
+    await msg.answer("📝 Xabar matnini yozing:", reply_markup=cancel_kb(lang))
     await state.set_state(Broadcast.text)
 
 @dp.message(Broadcast.text)
 async def bc_text(msg: types.Message, state: FSMContext):
-    if msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
+    uid = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel") or msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
         await state.clear()
-        await msg.answer("Bekor qilindi.", reply_markup=main_kb())
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
     d     = await state.get_data()
     text  = msg.text.strip()
@@ -2723,7 +2752,7 @@ async def bc_text(msg: types.Message, state: FSMContext):
         except Exception:
             pass
         await asyncio.sleep(0.05)
-    await msg.answer(f"✅ Xabar *{sent}/{len(uids)}* ta foydalanuvchiga yuborildi!", reply_markup=main_kb())
+    await msg.answer(f"✅ Xabar *{sent}/{len(uids)}* ta foydalanuvchiga yuborildi!", reply_markup=main_kb(lang))
 
 # ── MUTE HANDLERS ──────────────────────────────────────
 @dp.callback_query(F.data == "adm_mute")
@@ -2739,9 +2768,11 @@ async def adm_mute(cb: types.CallbackQuery, state: FSMContext):
 
 @dp.message(MuteFlow.user_id)
 async def mute_get_user_id(msg: types.Message, state: FSMContext):
-    if msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
+    uid = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel") or msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
         await state.clear()
-        await msg.answer("Bekor qilindi.", reply_markup=main_kb())
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
     txt = msg.text.strip()
     if not txt.isdigit():
@@ -2762,9 +2793,11 @@ async def mute_get_user_id(msg: types.Message, state: FSMContext):
 
 @dp.message(MuteFlow.duration)
 async def mute_get_duration(msg: types.Message, state: FSMContext):
-    if msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
+    uid = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel") or msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
         await state.clear()
-        await msg.answer("Bekor qilindi.", reply_markup=main_kb())
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
     txt = msg.text.strip()
     if not txt.isdigit() or int(txt) <= 0:
@@ -2812,10 +2845,11 @@ async def mute_set_unit(cb: types.CallbackQuery, state: FSMContext):
     except Exception:
         pass
 
+    admin_lang = await get_user_lang(cb.from_user.id)
     await cb.message.answer(
         f"✅ @{target_name} (`{target_id}`) foydalanuvchiga\n"
         f"⏱ {duration} {unit_label}ga mute berildi!",
-        reply_markup=main_kb()
+        reply_markup=main_kb(admin_lang)
     )
     await cb.answer()
 
@@ -3184,20 +3218,31 @@ async def ax_login_phone(msg: types.Message, state: FSMContext):
         await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
     phone        = msg.text.strip()
+    # Raqam formati tekshirish
+    clean_phone = phone.replace(" ", "").replace("-", "")
+    if not (clean_phone.startswith("+") and len(clean_phone) >= 10):
+        await msg.answer("❌ Noto'g'ri format! Masalan: +998901234567")
+        return
     session_path = f"{AUTOXABAR_DIR}/ax_{uid}"
-    client       = TelegramClient(session_path, API_ID, API_HASH)
+    # Eski client bo'lsa disconnect
+    old_client = ax_clients.pop(uid, None)
+    if old_client:
+        try:
+            await old_client.disconnect()
+        except Exception:
+            pass
+    client = TelegramClient(session_path, API_ID, API_HASH)
     try:
         await client.connect()
-        # O'z nomerini kiritsa ham ishlash uchun — force_sms=True ishlatmaymiz
-        # bot akkauntiga SMS kod borishi mumkin emas, shuning uchun:
-        sent_code = await client.send_code_request(phone)
-        await state.update_data(ax_phone=phone, ax_phone_hash=sent_code.phone_code_hash)
+        sent_code = await client.send_code_request(clean_phone)
+        await state.update_data(ax_phone=clean_phone, ax_phone_hash=sent_code.phone_code_hash)
         ax_clients[uid] = client
         await state.set_state(AutoXabarLogin.code)
         await msg.answer(
-            "✅ SMS kod yuborildi!\n\n"
-            "📨 Telegram ilovangizga kelgan 5 raqamli kodni kiriting\n"
-            "_(Agar o'z nomeringizni kiritgan bo'lsangiz, Telegram'dagi \"Saved Messages\"ga kod keladi)_:",
+            "✅ Kod yuborildi!\n\n"
+            "📨 Telegram ilovangizga (yoki SMS orqali) kelgan 5 raqamli kodni kiriting.\n"
+            "_(O'z nomeringizni kiritgan bo'lsangiz, Telegram'dagi Saved Messages'ga kod keladi)_\n\n"
+            "Kodni kiriting (masalan: `12345` yoki `1-2345`):",
             reply_markup=cancel_kb(lang)
         )
     except Exception as e:
@@ -3205,7 +3250,17 @@ async def ax_login_phone(msg: types.Message, state: FSMContext):
             await client.disconnect()
         except Exception:
             pass
-        await msg.answer(f"❌ Xato: {e}\n\nQaytadan urinib ko'ring.")
+        err = str(e)
+        if "PHONE_NUMBER_INVALID" in err or "PhoneNumberInvalid" in err:
+            await msg.answer("❌ Noto'g'ri telefon raqami! Qaytadan kiriting (+998...):")
+        elif "PHONE_NUMBER_BANNED" in err:
+            await msg.answer("❌ Bu telefon raqami bloklangan.")
+        elif "FLOOD" in err.upper():
+            await msg.answer(f"❌ Juda ko'p urinish! Bir oz kutib qaytadan urinib ko'ring.")
+        elif "AUTH_RESTART" in err:
+            await msg.answer("❌ Autentifikatsiyani qaytadan boshlash kerak. Yana bir urinib ko'ring.")
+        else:
+            await msg.answer(f"❌ Xato: {err}\n\nQaytadan urinib ko'ring.")
 
 @dp.message(AutoXabarLogin.code)
 async def ax_login_code(msg: types.Message, state: FSMContext):
@@ -3225,16 +3280,41 @@ async def ax_login_code(msg: types.Message, state: FSMContext):
     client = ax_clients.get(uid)
     if not client:
         await state.clear()
-        await msg.answer("❌ Session topilmadi. Qaytadan /start bosing.", reply_markup=main_kb(lang))
+        await msg.answer("❌ Session topilmadi. Qaytadan 📢 Autoxabar tugmasini bosing.", reply_markup=main_kb(lang))
         return
-    # Kodni tozalash — foydalanuvchi "12345" yoki "1-2345" shaklida yuborishi mumkin
+    # Kodni tozalash
     code = msg.text.strip().replace("-", "").replace(" ", "")
+    if not code.isdigit():
+        await msg.answer("❌ Faqat raqamlar kiriting (masalan: 12345):")
+        return
     try:
-        await client.sign_in(sd["ax_phone"], code, phone_code_hash=sd["ax_phone_hash"])
+        from telethon.errors import (
+            SessionPasswordNeededError, PhoneCodeInvalidError,
+            PhoneCodeExpiredError, PhoneNumberUnoccupiedError
+        )
+        try:
+            await client.sign_in(sd["ax_phone"], code, phone_code_hash=sd.get("ax_phone_hash", ""))
+        except SessionPasswordNeededError:
+            await state.set_state(AutoXabarLogin.password)
+            await msg.answer("🔐 2FA (ikki bosqichli tekshiruv) parolingizni kiriting:", reply_markup=cancel_kb(lang))
+            return
+        except PhoneCodeInvalidError:
+            await msg.answer("❌ Kod noto'g'ri! Qaytadan kodni kiriting:")
+            return
+        except PhoneCodeExpiredError:
+            await state.clear()
+            c = ax_clients.pop(uid, None)
+            if c:
+                try:
+                    await c.disconnect()
+                except Exception:
+                    pass
+            await msg.answer("❌ Kod muddati tugagan! Qaytadan 📢 Autoxabar tugmasini bosib boshlang.", reply_markup=main_kb(lang))
+            return
         await _ax_after_login(uid, sd["ax_phone"], client, msg, state)
     except Exception as e:
         err = str(e)
-        if "SessionPasswordNeeded" in err or "two-step" in err.lower() or "2FA" in err:
+        if "SessionPasswordNeeded" in err or "two-step" in err.lower() or "2FA" in err or "password" in err.lower():
             await state.set_state(AutoXabarLogin.password)
             await msg.answer("🔐 2FA parolingizni kiriting:", reply_markup=cancel_kb(lang))
         elif "PhoneCodeInvalid" in err or "PHONE_CODE_INVALID" in err:
@@ -3249,7 +3329,7 @@ async def ax_login_code(msg: types.Message, state: FSMContext):
                     pass
             await msg.answer("❌ Kod muddati tugagan! Qaytadan 📢 Autoxabar tugmasini bosib boshlang.", reply_markup=main_kb(lang))
         else:
-            await msg.answer(f"❌ Xato: {e}")
+            await msg.answer(f"❌ Xato: {err}\n\nKodni qaytadan kiriting yoki bekor qiling:")
 
 @dp.message(AutoXabarLogin.password)
 async def ax_login_password(msg: types.Message, state: FSMContext):
@@ -3515,10 +3595,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-ENDOFFILE
-echo "Done"
-Output
-
-Input validation errors occurred:
-description: Field required
-Done
