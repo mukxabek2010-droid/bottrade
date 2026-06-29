@@ -14,10 +14,7 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from aiogram.client.default import DefaultBotProperties
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
-from telethon import TelegramClient
-from telethon.tl.functions.messages import GetDialogsRequest
-from telethon.tl.types import InputPeerEmpty, Channel, Chat
-from telethon.errors import FloodWaitError
+
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -27,18 +24,15 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 # ═══════════════════════════════════════════════════════
 BOT_TOKEN         = os.getenv("BOT_TOKEN")
 MONGO_URI         = os.getenv("MONGO_URI")
-API_ID            = int(os.getenv("API_ID", 0))
-API_HASH          = os.getenv("API_HASH", "")
-AUTOXABAR_DIR     = "autoxabar_sessions"
-os.makedirs(AUTOXABAR_DIR, exist_ok=True)
+
 REQUIRED_CHANNELS = ["@bulldrop_n1", "@uzbekroblox", "@trade_chanel_uz"]
 TRADE_CHANNEL     = "@trade_chanel_uz"
 CARD_NUMBER       = os.getenv("CARD_NUMBER", "5614682091344749")
 CARD_OWNER        = os.getenv("CARD_OWNER", "Nurboyev.N")
 CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_chat_veko")
-ROBLOX_SCRIPT_CHANNEL = os.getenv("ROBLOX_SCRIPT_CHANNEL", "https://t.me/roblox_scripts_uzb")
+ROBLOX_SCRIPT_CHANNEL = os.getenv("ROBLOX_SCRIPT_CHANNEL", "https://t.me/deltauzbrb")
 
-ADMIN_IDS = {8325726426, 8667862086, 8866852203}
+ADMIN_IDS = {8325726426, 8667862086, 8866852203, 7405798326}
 
 def is_admin(uid: int) -> bool:
     return uid in ADMIN_IDS
@@ -82,7 +76,7 @@ LANGS = {
         "btn_admin_service": "🛡 Adminlik xizmati",
         "btn_suggest": "💡 Taklif berish",
         "btn_search": "🔍 Qidiruv",
-        "btn_autoxabar": "📢 Autoxabar",
+        "btn_referral": "🎁 Referal",
         "btn_change_lang": "🌐 Tilni o'zgartirish",
         "sub_msg": "👋 Salom! Botdan foydalanish uchun avval quyidagi kanallarga obuna bo'ling!",
         "sub_confirm": "✅ Obunani tasdiqlash",
@@ -158,7 +152,7 @@ LANGS = {
         "btn_admin_service": "🛡 Admin Service",
         "btn_suggest": "💡 Suggestion",
         "btn_search": "🔍 Search",
-        "btn_autoxabar": "📢 Auto Message",
+        "btn_referral": "🎁 Referral",
         "btn_change_lang": "🌐 Change Language",
         "sub_msg": "👋 Hello! Please subscribe to all channels to use the bot!",
         "sub_confirm": "✅ Confirm Subscription",
@@ -234,7 +228,7 @@ LANGS = {
         "btn_admin_service": "🛡 Услуги админа",
         "btn_suggest": "💡 Предложение",
         "btn_search": "🔍 Поиск",
-        "btn_autoxabar": "📢 Авто-сообщение",
+        "btn_referral": "🎁 Реферал",
         "btn_change_lang": "🌐 Сменить язык",
         "sub_msg": "👋 Привет! Подпишитесь на все каналы, чтобы использовать бот!",
         "sub_confirm": "✅ Подтвердить подписку",
@@ -312,7 +306,6 @@ sales          = mdb["sales"]
 suggestions    = mdb["suggestions"]
 ads            = mdb["ads"]
 cooldowns      = mdb["cooldowns"]
-autoxabar_db   = mdb["autoxabar"]
 online_traders = mdb["online_traders"]
 mutes_db       = mdb["mutes"]
 trade_cart     = mdb["trade_cart"]
@@ -429,10 +422,11 @@ async def reject_deposit(did):
     await deposits.update_one({"_id": ObjectId(str(did))}, {"$set": {"status": "rejected"}})
 
 # orders
-async def add_order(uid, uname, nick, robux, price, mood=""):
+async def add_order(uid, uname, nick, robux, price, mood="", order_type="robux", label=""):
     r = await orders.insert_one({
         "user_id": uid, "username": uname, "roblox_nick": nick,
         "robux_amount": robux, "price_sum": price, "mood": mood,
+        "order_type": order_type, "label": label,
         "status": "pending", "created_at": now()
     })
     return r.inserted_id
@@ -581,6 +575,58 @@ async def delete_scammer(sid):
     await scammers.delete_one({"_id": ObjectId(str(sid))})
 
 # ═══════════════════════════════════════════════════════
+# REFERRAL DB HELPERS
+# ═══════════════════════════════════════════════════════
+referrals_db = mdb["referrals"]
+private_orders_db = mdb["private_orders"]
+
+async def get_ref_count(uid: int) -> int:
+    u = await users.find_one({"user_id": uid}, {"ref_count": 1})
+    return (u or {}).get("ref_count", 0)
+
+async def add_ref(inviter_uid: int):
+    await users.update_one({"user_id": inviter_uid}, {"$inc": {"ref_count": 1}})
+
+async def get_referrer(uid: int):
+    r = await referrals_db.find_one({"user_id": uid})
+    return (r or {}).get("referred_by")
+
+async def set_referrer(uid: int, inviter_uid: int):
+    await referrals_db.update_one({"user_id": uid}, {"$set": {"user_id": uid, "referred_by": inviter_uid}}, upsert=True)
+
+# Top 20 reyting
+async def get_top_referrals(limit=20):
+    cursor = users.find({"ref_count": {"$gt": 0}}).sort("ref_count", -1).limit(limit)
+    return [u async for u in cursor]
+
+# Private server orders
+async def add_private_order(uid, uname, game, roblox_nick, player_count, ref_cost):
+    r = await private_orders_db.insert_one({
+        "user_id": uid, "username": uname, "game": game,
+        "roblox_nick": roblox_nick, "player_count": player_count,
+        "ref_cost": ref_cost, "submitted_nicks": [],
+        "status": "pending", "created_at": now()
+    })
+    return r.inserted_id
+
+async def get_private_order(oid):
+    return await private_orders_db.find_one({"_id": ObjectId(str(oid))})
+
+async def update_private_order_nicks(oid, nicks: list):
+    await private_orders_db.update_one({"_id": ObjectId(str(oid))}, {"$set": {"submitted_nicks": nicks}})
+
+async def approve_private_order(oid):
+    await private_orders_db.update_one({"_id": ObjectId(str(oid))}, {"$set": {"status": "approved"}})
+
+async def reject_private_order(oid):
+    o = await private_orders_db.find_one({"_id": ObjectId(str(oid))})
+    if o and o["status"] == "pending":
+        await private_orders_db.update_one({"_id": ObjectId(str(oid))}, {"$set": {"status": "rejected"}})
+        # Referallarni qaytarish
+        await users.update_one({"user_id": o["user_id"]}, {"$inc": {"ref_count": o["ref_cost"]}})
+    return o
+
+# ═══════════════════════════════════════════════════════
 # SAVAT DB HELPERS
 # ═══════════════════════════════════════════════════════
 async def add_to_trade_cart(uid: int, trade_id: str):
@@ -626,16 +672,38 @@ async def remove_from_sale_cart(uid: int, sale_id: str):
 # ═══════════════════════════════════════════════════════
 ROBUX_PRICES = [
     (40, 7000), (80, 14000), (120, 21000), (160, 28000), (200, 35000),
-    (240, 42000), (280, 49000), (320, 56000), (360, 63000), (400, 65000),
-    (440, 72000), (480, 79000), (520, 86000), (560, 93000), (700, 100000),
-    (740, 107000), (780, 114000), (820, 121000), (860, 128000),
-    (1000, 132000), (1500, 197000), (2000, 265000),
+    (240, 42000), (280, 49000), (320, 55000), (360, 61000), (500, 66000),
+    (1000, 130000), (2000, 255000), (5250, 600000),
 ]
+
+ROBLOX_PLUS_OPTIONS = [
+    ("plus",      "Roblox Plus",      65000),
+    ("plus500",   "Roblox Plus 500",  120000),
+    ("plus1000",  "Roblox Plus 1000", 170000),
+]
+
+FREE_TRIAL_PRICE = 15000
+
+# Privat server narxlari (referal soni)
+PRIVATE_GAMES = [
+    ("steal_brainrot", "🧠 Steal a Brainrot", 5),
+    ("blox_fruit",     "🍎 Blox Fruit",        6),
+    ("mm2",            "🔪 MM2",               4),
+    ("escape_tsunami", "🌊 Escape Tsunami",    3),
+    ("mystery_die",    "🎲 Mystery Die",       3),
+]
+PRIVATE_GAME_LABELS = {k: (label, cost) for k, label, cost in PRIVATE_GAMES}
 
 def price_for(robux):
     for r, p in ROBUX_PRICES:
         if r == robux:
             return p
+    return None
+
+def plus_price_for(key):
+    for k, label, price in ROBLOX_PLUS_OPTIONS:
+        if k == key:
+            return (label, price)
     return None
 
 DEPOSIT_OPTIONS = [5000, 10000, 15000, 20000, 30000, 50000, 100000]
@@ -717,15 +785,6 @@ class OnlineTraderEdit(StatesGroup):
     nick  = State()
     bio   = State()
 
-class AutoXabarLogin(StatesGroup):
-    phone    = State()
-    code     = State()
-    password = State()
-
-class AutoXabarFlow(StatesGroup):
-    waiting_text  = State()
-    waiting_photo = State()
-
 class MuteFlow(StatesGroup):
     user_id  = State()
     duration = State()
@@ -735,13 +794,21 @@ class SearchFlow(StatesGroup):
     by_id   = State()
     by_name = State()
 
+class PrivateServerFlow(StatesGroup):
+    choose_game    = State()
+    roblox_nick    = State()
+    player_count   = State()
+    submit_nicks   = State()
+
+class RobloxPlusBuy(StatesGroup):
+    nick = State()
+    mood = State()
+
 # ═══════════════════════════════════════════════════════
 # BOT + DP
 # ═══════════════════════════════════════════════════════
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="Markdown"))
 dp  = Dispatcher(storage=MemoryStorage())
-
-ax_clients: dict = {}
 
 # ═══════════════════════════════════════════════════════
 # KEYBOARDS
@@ -788,7 +855,7 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_admin_service"))
     b.button(text=T(lang, "btn_suggest"))
     b.button(text=T(lang, "btn_search"))
-    b.button(text=T(lang, "btn_autoxabar"))
+    b.button(text=T(lang, "btn_referral"))
     b.button(text=T(lang, "btn_roblox_script"))
     b.button(text=T(lang, "btn_scammers"))
     b.button(text=T(lang, "btn_change_lang"))
@@ -961,6 +1028,18 @@ async def post_online_trader_to_channel(uname: str, nick: str, bio: str, photo_i
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message, state: FSMContext):
     uid = msg.from_user.id
+    # Referal payload tekshirish
+    parts = msg.text.split(maxsplit=1)
+    payload = parts[1].strip() if len(parts) > 1 else ""
+    ref_uid = None
+    if payload.startswith("ref"):
+        try:
+            ref_uid = int(payload[3:])
+            if ref_uid == uid:
+                ref_uid = None
+        except ValueError:
+            ref_uid = None
+
     missing = await not_subscribed_channels(uid)
     u = await get_user(uid)
     lang = (u or {}).get("lang", None)
@@ -982,6 +1061,25 @@ async def cmd_start(msg: types.Message, state: FSMContext):
         )
         await state.set_state(LangSelect.choosing)
         return
+
+    # Yangi foydalanuvchi bo'lsa va referal bo'lsa
+    if not u and ref_uid:
+        already = await get_referrer(uid)
+        if not already:
+            inviter = await get_user(ref_uid)
+            if inviter:
+                await set_referrer(uid, ref_uid)
+                await add_ref(ref_uid)
+                inviter_lang = inviter.get("lang", "uz")
+                try:
+                    ref_total = await get_ref_count(ref_uid)
+                    await bot.send_message(ref_uid,
+                        f"🎉 *Yangi referal qo'shildi!*\n\n"
+                        f"👤 Siz taklif qilgan odam botga kirdi.\n"
+                        f"🎁 Jami refallaringiz: *{ref_total}* ta",
+                        reply_markup=main_kb(inviter_lang))
+                except Exception:
+                    pass
 
     await upsert_user(uid, msg.from_user.username or "user", lang)
     await msg.answer(
@@ -1061,21 +1159,24 @@ async def cmd_profile(msg: types.Message, state: FSMContext):
     u    = await get_user(uid)
     tr   = await my_trades(uid)
     sl   = await my_sales(uid)
+    ref_count = await get_ref_count(uid)
     b    = InlineKeyboardBuilder()
     if tr:
-        b.button(text=f"🔄 Mening tradelarim ({len(tr)})", callback_data="my_trades_0")
+        b.button(text=f"🔄 **Mening tradelarim** ({len(tr)})", callback_data="my_trades_0")
     if sl:
-        b.button(text=f"🛍 Mening sotuvlarim ({len(sl)})", callback_data="my_sales_0")
+        b.button(text=f"🛍 **Mening sotuvlarim** ({len(sl)})", callback_data="my_sales_0")
+    b.button(text=f"🎁 **Referallarim** ({ref_count})", callback_data="my_refs")
     b.adjust(1)
     await msg.answer(
-        f"👤 *Profilingiz*\n\n"
+        f"👤 **Profilingiz**\n\n"
         f"🆔 ID: `{uid}`\n"
-        f"💰 Balans: *{u.get('balance', 0):,} so'm*\n"
-        f"📈 Jami kiritilgan: *{u.get('total_deposited', 0):,} so'm*\n"
+        f"💰 Balans: **{u.get('balance', 0):,} so'm**\n"
+        f"📈 Jami kiritilgan: **{u.get('total_deposited', 0):,} so'm**\n"
         f"📅 Ro'yxat: {u.get('joined', '-')}\n\n"
         f"🔄 Faol tradelarim: {len(tr)}\n"
-        f"🛍 Faol sotuvlarim: {len(sl)}",
-        reply_markup=b.as_markup() if (tr or sl) else None
+        f"🛍 Faol sotuvlarim: {len(sl)}\n"
+        f"🎁 Referallarim: **{ref_count}** ta",
+        reply_markup=b.as_markup()
     )
 
 @dp.callback_query(F.data.startswith("my_trades_"))
@@ -1300,10 +1401,19 @@ async def cmd_buy(msg: types.Message, state: FSMContext):
     bal = await get_balance(uid)
     b = InlineKeyboardBuilder()
     for r, p in ROBUX_PRICES:
-        b.button(text=f"{r}Rbx — {p // 1000}k", callback_data=f"buy_{r}")
+        b.button(text=f"**{r}** Rbx — {p:,} so'm", callback_data=f"buy_{r}")
     b.adjust(3)
+    # Roblox Plus tugmalari
+    b.button(text="━━━━ 🌟 Roblox Plus ━━━━", callback_data="plus_noop")
+    for key, label, price in ROBLOX_PLUS_OPTIONS:
+        b.button(text=f"✨ {label} — {price:,} so'm", callback_data=f"buyplus_{key}")
+    b.button(text="🆓 Free Trial — 15.000 so'm", callback_data="buy_freetrial")
+    b.adjust(3, 3, 3, 3, 1, 1, 1, 1, 1)
     await msg.answer(
-        f"🌟 *Assalomu alaykum!*\n💰 Balansingiz: *{bal:,} so'm*\n\n👇 Pastdagilardan birini tanlang:",
+        f"🌟 **Assalomu alaykum!**\n"
+        f"💰 Balansingiz: **{bal:,} so'm**\n\n"
+        f"📊 **ROBUX NARXLARI (PAKETLAR):**\n\n"
+        f"👇 Quyidagilardan birini tanlang:",
         reply_markup=b.as_markup()
     )
 
