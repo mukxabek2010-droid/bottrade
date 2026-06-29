@@ -3662,6 +3662,362 @@ async def adm_back(cb: types.CallbackQuery):
     await cb.answer()
 
 # ═══════════════════════════════════════════════════════
+# 🎁 REFERAL BO'LIMI
+# ═══════════════════════════════════════════════════════
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_referral") for l in LANGS)))
+async def cmd_referral(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    uid   = msg.from_user.id
+    lang  = await get_user_lang(uid)
+    uname = msg.from_user.username or ""
+    ref_link = f"https://t.me/{(await bot.get_me()).username}?start=ref{uid}"
+    ref_count = await get_ref_count(uid)
+
+    text = (
+        f"🎁 **Referal tizimi**\n\n"
+        f"🔗 Havolangizni do'stlaringizga yuboring!\n"
+        f"Har bir yangi foydalanuvchi uchun **1 referal** qo'shiladi.\n\n"
+        f"👥 Sizning referallaringiz: **{ref_count} ta**\n\n"
+        f"🆓 **Tekinga Privat Server olish:**\n"
+        f"Referallaringiz orqali privat server yutib oling!\n\n"
+        f"📋 Havolangiz:\n`{ref_link}`"
+    )
+    b = InlineKeyboardBuilder()
+    b.button(text="📋 Havolani nusxalash", switch_inline_query=ref_link)
+    b.button(text="🎮 Referallarni ishlatish", callback_data="ref_use")
+    b.button(text="🏆 Top 20 Reyting", callback_data="ref_top")
+    b.adjust(1)
+    await msg.answer(text, reply_markup=b.as_markup())
+
+@dp.callback_query(F.data == "ref_use")
+async def cb_ref_use(cb: types.CallbackQuery):
+    uid       = cb.from_user.id
+    ref_count = await get_ref_count(uid)
+
+    text = (
+        f"🎁 **Referallaringiz:** {ref_count} ta\n\n"
+        f"🔄 **SHOP — Privat server narxlari:**\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"1️⃣ 🧠 **Steal a Brainrot** ➡️ 5 ta referal\n"
+        f"2️⃣ 🍎 **Blox Fruit** ➡️ 6 ta referal\n"
+        f"3️⃣ 🔪 **MM2** ➡️ 4 ta referal\n"
+        f"4️⃣ 🌊 **Escape Tsunami** ➡️ 3 ta referal\n"
+        f"5️⃣ 🎲 **Mystery Die** ➡️ 3 ta referal\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
+    b = InlineKeyboardBuilder()
+    b.button(text="🎮 Privat Server olish", callback_data="private_server_start")
+    b.adjust(1)
+    await cb.message.edit_text(text, reply_markup=b.as_markup())
+    await cb.answer()
+
+@dp.callback_query(F.data == "ref_top")
+async def cb_ref_top(cb: types.CallbackQuery):
+    top = await get_top_referrals(20)
+    if not top:
+        await cb.answer("Hozircha reyting bo'sh!", show_alert=True)
+        return
+    medals = ["🥇", "🥈", "🥉"]
+    lines = ["🏆 **TOP 20 — Referal Reytingi**\n━━━━━━━━━━━━━━━━━━━━"]
+    for i, u in enumerate(top, 1):
+        medal = medals[i-1] if i <= 3 else f"{i}."
+        uname = u.get("username") or "-"
+        cnt   = u.get("ref_count", 0)
+        lines.append(f"{medal} @{uname} — **{cnt}** referal")
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    await cb.message.edit_text("\n".join(lines))
+    await cb.answer()
+
+@dp.callback_query(F.data == "my_refs")
+async def cb_my_refs(cb: types.CallbackQuery):
+    uid       = cb.from_user.id
+    ref_count = await get_ref_count(uid)
+    ref_link  = f"https://t.me/{(await bot.get_me()).username}?start=ref{uid}"
+
+    text = (
+        f"🎁 **Referallaringiz:** {ref_count} ta\n\n"
+        f"🔗 Havolangiz:\n`{ref_link}`\n\n"
+        f"🔄 **SHOP — Privat server narxlari:**\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"1️⃣ 🧠 **Steal a Brainrot** ➡️ 5 ta referal\n"
+        f"2️⃣ 🍎 **Blox Fruit** ➡️ 6 ta referal\n"
+        f"3️⃣ 🔪 **MM2** ➡️ 4 ta referal\n"
+        f"4️⃣ 🌊 **Escape Tsunami** ➡️ 3 ta referal\n"
+        f"5️⃣ 🎲 **Mystery Die** ➡️ 3 ta referal\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
+    b = InlineKeyboardBuilder()
+    b.button(text="📋 Havolani nusxalash", switch_inline_query=ref_link)
+    b.button(text="🎮 Privat Server olish", callback_data="private_server_start")
+    b.button(text="🏆 Top 20 Reyting", callback_data="ref_top")
+    b.adjust(1)
+    await cb.message.answer(text, reply_markup=b.as_markup())
+    await cb.answer()
+
+# ═══════════════════════════════════════════════════════
+# 🎮 PRIVAT SERVER BO'LIMI
+# ═══════════════════════════════════════════════════════
+@dp.callback_query(F.data == "private_server_start")
+async def cb_private_server_start(cb: types.CallbackQuery, state: FSMContext):
+    uid  = cb.from_user.id
+    lang = await get_user_lang(uid)
+    b = InlineKeyboardBuilder()
+    for key, label, cost in PRIVATE_GAMES:
+        ref_count = await get_ref_count(uid)
+        status = "✅" if ref_count >= cost else "🔒"
+        b.button(text=f"{status} {label} — {cost} referal", callback_data=f"ps_game_{key}")
+    b.button(text="❌ Bekor qilish", callback_data="ps_cancel")
+    b.adjust(1)
+    ref_count = await get_ref_count(uid)
+    await cb.message.answer(
+        f"🎮 **Privat Server olish**\n\n"
+        f"👥 Sizning referallaringiz: **{ref_count} ta**\n\n"
+        f"Qaysi o'yin uchun privat server kerak?",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("ps_game_"))
+async def cb_ps_game(cb: types.CallbackQuery, state: FSMContext):
+    uid  = cb.from_user.id
+    lang = await get_user_lang(uid)
+    game = cb.data[len("ps_game_"):]
+    info = PRIVATE_GAME_LABELS.get(game)
+    if not info:
+        await cb.answer("❌ Noto'g'ri o'yin!", show_alert=True)
+        return
+    label, cost = info
+    ref_count = await get_ref_count(uid)
+    if ref_count < cost:
+        await cb.answer(
+            f"❌ Yetarli referal yo'q!\nKerak: {cost} ta\nSizda: {ref_count} ta",
+            show_alert=True
+        )
+        return
+    await state.update_data(ps_game=game, ps_cost=cost, ps_label=label)
+    await cb.message.answer(
+        f"🎮 **{label}** uchun privat server\n\n"
+        f"💸 Narxi: **{cost} ta referal**\n\n"
+        f"📝 Roblox nikinigizni kiriting:",
+        reply_markup=cancel_kb(lang)
+    )
+    await state.set_state(PrivateServerFlow.roblox_nick)
+    await cb.answer()
+
+@dp.message(PrivateServerFlow.roblox_nick)
+async def ps_roblox_nick(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    nick = msg.text.strip()
+    if len(nick) < 3:
+        await msg.answer("❌ Nik kamida 3 ta belgi bo'lsin:")
+        return
+    await state.update_data(ps_roblox_nick=nick)
+    await msg.answer(
+        f"🎮 Roblox nik: `{esc_md(nick)}`\n\n"
+        f"👥 Necha kishilik privat server kerak?",
+        reply_markup=cancel_kb(lang)
+    )
+    await state.set_state(PrivateServerFlow.player_count)
+
+@dp.message(PrivateServerFlow.player_count)
+async def ps_player_count(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = msg.text.strip()
+    if not txt.isdigit() or int(txt) < 1 or int(txt) > 100:
+        await msg.answer("❌ 1 dan 100 gacha raqam kiriting:")
+        return
+    await state.update_data(ps_player_count=int(txt))
+    d = await state.get_data()
+    await msg.answer(
+        f"📋 **Buyurtma ma'lumotlari:**\n\n"
+        f"🎮 O'yin: **{d['ps_label']}**\n"
+        f"👤 Roblox nik: `{esc_md(d['ps_roblox_nick'])}`\n"
+        f"👥 Kishilar soni: **{d['ps_player_count']}**\n\n"
+        f"➕ Privatga qo'shmoqchi bo'lgan barcha akkountlaringizning Roblox niklarini yuboring:\n"
+        f"_(Har bir nikni yangi qatorga yozing)_",
+        reply_markup=cancel_kb(lang)
+    )
+    await state.set_state(PrivateServerFlow.submit_nicks)
+
+@dp.message(PrivateServerFlow.submit_nicks)
+async def ps_submit_nicks(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    nicks = [n.strip() for n in msg.text.strip().split("\n") if n.strip()]
+    d = await state.get_data()
+
+    b = InlineKeyboardBuilder()
+    b.button(text="✅ Tashladik", callback_data="ps_confirm")
+    b.button(text="❌ Bekor qilish", callback_data="ps_cancel_flow")
+    b.adjust(1)
+    await state.update_data(ps_nicks=nicks)
+    await msg.answer(
+        f"📋 **Tekshiring:**\n\n"
+        f"🎮 O'yin: **{d['ps_label']}**\n"
+        f"👤 Asosiy nik: `{esc_md(d['ps_roblox_nick'])}`\n"
+        f"👥 Soni: **{d['ps_player_count']}** kishi\n"
+        f"📝 Niklar:\n" + "\n".join(f"• `{esc_md(n)}`" for n in nicks),
+        reply_markup=b.as_markup()
+    )
+
+@dp.callback_query(F.data == "ps_confirm")
+async def ps_confirm(cb: types.CallbackQuery, state: FSMContext):
+    uid   = cb.from_user.id
+    lang  = await get_user_lang(uid)
+    d     = await state.get_data()
+    game  = d.get("ps_game")
+    cost  = d.get("ps_cost", 0)
+    label = d.get("ps_label", "")
+    nick  = d.get("ps_roblox_nick", "")
+    count = d.get("ps_player_count", 0)
+    nicks = d.get("ps_nicks", [])
+    uname = cb.from_user.username or "-"
+
+    # Referalni yana tekshir (bir vaqtda ikki marta bosmasligi uchun)
+    ref_count = await get_ref_count(uid)
+    if ref_count < cost:
+        await cb.answer(f"❌ Yetarli referal yo'q! Kerak: {cost}", show_alert=True)
+        await state.clear()
+        return
+
+    # Referallarni yechi
+    await users.update_one({"user_id": uid}, {"$inc": {"ref_count": -cost}})
+
+    oid = await add_private_order(uid, uname, game, nick, count, cost)
+
+    # Adminga xabar
+    admin_text = (
+        f"🎮 **Yangi Privat Server so'rovi** #{short_id(oid)}\n\n"
+        f"👤 @{esc_md(uname)} (`{uid}`)\n"
+        f"🎮 O'yin: **{label}**\n"
+        f"🔑 Asosiy nik: `{esc_md(nick)}`\n"
+        f"👥 Kishilar: **{count}**\n"
+        f"📝 Niklar:\n" + "\n".join(f"• `{esc_md(n)}`" for n in nicks) +
+        f"\n\n💸 Yechildi: **{cost} ta referal**"
+    )
+    ab = InlineKeyboardBuilder()
+    ab.button(text="✅ Tasdiqlash", callback_data=f"ps_ok_{oid}")
+    ab.button(text="❌ Rad etish",  callback_data=f"ps_no_{oid}")
+    ab.adjust(2)
+    await notify_admins(admin_text, markup=ab.as_markup())
+    await state.clear()
+
+    await cb.message.answer(
+        f"✅ **So'rovingiz qabul qilindi!**\n\n"
+        f"⏰ 5 soat ichida privat serveringiz ochiladi.\n"
+        f"Admin tasdiqlashini kuting.",
+        reply_markup=main_kb(lang)
+    )
+    await cb.answer()
+
+@dp.callback_query(F.data == "ps_cancel_flow")
+async def ps_cancel_flow(cb: types.CallbackQuery, state: FSMContext):
+    uid  = cb.from_user.id
+    lang = await get_user_lang(uid)
+    await state.clear()
+    await cb.message.edit_text("❌ Bekor qilindi.")
+    await cb.message.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+    await cb.answer()
+
+@dp.callback_query(F.data == "ps_cancel")
+async def ps_cancel(cb: types.CallbackQuery):
+    uid  = cb.from_user.id
+    lang = await get_user_lang(uid)
+    await cb.message.edit_text("❌ Bekor qilindi.")
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("ps_ok_"))
+async def ps_admin_ok(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    oid = cb.data[len("ps_ok_"):]
+    o   = await get_private_order(oid)
+    if not o or o["status"] != "pending":
+        await cb.answer("Allaqachon ko'rilgan!", show_alert=True)
+        return
+    await approve_private_order(oid)
+    user_lang = await get_user_lang(o["user_id"])
+    try:
+        info = PRIVATE_GAME_LABELS.get(o.get("game", ""), ("O'yin", 0))
+        await bot.send_message(
+            o["user_id"],
+            f"🎉 **Privat serveringiz ochildi!**\n\n"
+            f"🎮 O'yin: **{info[0]}**\n"
+            f"👤 Nik: `{esc_md(o.get('roblox_nick',''))}`\n\n"
+            f"✅ Robloxga kirib tekshirishingiz mumkin.\n"
+            f"👥 Lord\\_plays77 shunga druzya tashlang — privatga qo'shmoqchi bo'lgan akkountlaringizdan!",
+            reply_markup=main_kb(user_lang)
+        )
+    except Exception:
+        pass
+    try:
+        await cb.message.edit_text(cb.message.text + f"\n\n✅ TASDIQLANDI ({now()})")
+    except Exception:
+        pass
+    await cb.answer("✅ Tasdiqlandi!")
+
+@dp.callback_query(F.data.startswith("ps_no_"))
+async def ps_admin_no(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    oid = cb.data[len("ps_no_"):]
+    o   = await reject_private_order(oid)
+    if not o:
+        await cb.answer("Allaqachon ko'rilgan!", show_alert=True)
+        return
+    user_lang = await get_user_lang(o["user_id"])
+    try:
+        await bot.send_message(
+            o["user_id"],
+            f"❌ **Admin so'rovingizni rad etdi.**\n\n"
+            f"🔄 Referallaringiz hisobingizga qaytarildi: **+{o.get('ref_cost', 0)} ta**",
+            reply_markup=main_kb(user_lang)
+        )
+    except Exception:
+        pass
+    try:
+        await cb.message.edit_text(cb.message.text + f"\n\n❌ RAD ETILDI + referallar qaytarildi ({now()})")
+    except Exception:
+        pass
+    await cb.answer("❌ Rad etildi!")
+
+# ═══════════════════════════════════════════════════════
+# 🏆 REYTING BO'LIMI
+# ═══════════════════════════════════════════════════════
+@dp.message(F.func(lambda msg: msg.text in ["🏆 Reyting", "🏆 Rating", "🏆 Рейтинг"]))
+async def cmd_leaderboard(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    top = await get_top_referrals(20)
+    if not top:
+        await msg.answer("🏆 Hozircha reyting bo'sh.", reply_markup=main_kb(await get_user_lang(msg.from_user.id)))
+        return
+    medals = ["🥇", "🥈", "🥉"]
+    lines = ["🏆 **TOP 20 — Referal Reytingi**\n━━━━━━━━━━━━━━━━━━━━"]
+    for i, u in enumerate(top, 1):
+        medal = medals[i-1] if i <= 3 else f"{i}."
+        uname = u.get("username") or "-"
+        cnt   = u.get("ref_count", 0)
+        lines.append(f"{medal} @{uname} — **{cnt}** referal")
+    lines.append("━━━━━━━━━━━━━━━━━━━━")
+    await msg.answer("\n".join(lines), reply_markup=main_kb(await get_user_lang(msg.from_user.id)))
+
+# ═══════════════════════════════════════════════════════
 # WEBHOOK + MAIN
 # ═══════════════════════════════════════════════════════
 WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL", "")
