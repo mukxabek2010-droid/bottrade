@@ -25,14 +25,14 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 BOT_TOKEN         = os.getenv("BOT_TOKEN")
 MONGO_URI         = os.getenv("MONGO_URI")
 
-REQUIRED_CHANNELS = ["@bulldrop_n1", "@uzbekroblox", "@trade_chanel_uz"]
+REQUIRED_CHANNELS = ["@nftandstarsq9", "@uzbekroblox", "@trade_chanel_uz"]
 TRADE_CHANNEL     = "@trade_chanel_uz"
 CARD_NUMBER       = os.getenv("CARD_NUMBER", "5614682091344749")
 CARD_OWNER        = os.getenv("CARD_OWNER", "Nurboyev.N")
 CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_chat_veko")
 ROBLOX_SCRIPT_CHANNEL = os.getenv("ROBLOX_SCRIPT_CHANNEL", "https://t.me/deltauzbrb")
 
-ADMIN_IDS = {8325726426, 8667862086, 8866852203, 7405798326}
+ADMIN_IDS = {8325726426, 8667862086, 8866852203, 7405798326, 6697359882}
 
 def is_admin(uid: int) -> bool:
     return uid in ADMIN_IDS
