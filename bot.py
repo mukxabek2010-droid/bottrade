@@ -36,8 +36,9 @@ TRADE_CHANNEL     = "@trade_chanel_uz"
 CARD_NUMBER       = os.getenv("CARD_NUMBER", "5614682091344749")
 CARD_OWNER        = os.getenv("CARD_OWNER", "Nurboyev.N")
 CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_chat_veko")
+ROBLOX_SCRIPT_CHANNEL = os.getenv("ROBLOX_SCRIPT_CHANNEL", "https://t.me/roblox_scripts_uzb")
 
-ADMIN_IDS = {8325726426, 8667862086}
+ADMIN_IDS = {8325726426, 8667862086, 8866852203}
 
 def is_admin(uid: int) -> bool:
     return uid in ADMIN_IDS
@@ -107,6 +108,36 @@ LANGS = {
         "add_cart": "🛒 Savatga solish",
         "trade_label": "🔄 TRADE",
         "sale_label": "🛍 SOTUV",
+        "btn_roblox_script": "🎮 Roblox Skript",
+        "roblox_script_msg": "🎮 *Roblox skriptlar*\n\nEng so'nggi va ishlaydigan skriptlarni olish uchun pastdagi kanalimizga o'ting:",
+        "btn_roblox_script_link": "📂 Skriptlar kanali",
+        "btn_scammers": "🚨 Mashkalar",
+        "scam_menu_msg": "🚨 *Mashkalar (firibgarlar) bo'limi*\n\nBu yerda firibgarlik qilgan foydalanuvchilar haqida ma'lumot olishingiz mumkin.",
+        "btn_scam_view": "👀 Mashkalarni ko'rish",
+        "btn_scam_search": "🔍 Qidirish",
+        "scam_search_prompt": "🔍 Tekshirmoqchi bo'lgan foydalanuvchining @username sini yozing:",
+        "scam_write_username": "✍️ @username yozing:",
+        "no_scammers": "🚨 Hozircha mashkalar ro'yxati bo'sh.",
+        "scam_not_found": "✅ Bu foydalanuvchi mashkalar ro'yxatida topilmadi.",
+        "scam_found_warn": "⚠️ *DIQQAT!* Bu foydalanuvchi mashkalar ro'yxatida bor!",
+        "choose_trade_category": "🔄 Qaysi o'yindagi tradelarni ko'rmoqchisiz?\n\nKategoriyani tanlang:",
+        "choose_sale_category": "📊 Qaysi o'yindagi sotuvlarni ko'rmoqchisiz?\n\nKategoriyani tanlang:",
+        "back_to_categories": "🔙 Kategoriyalar",
+        "no_trades_in_cat": "🔄 Bu kategoriyada hozircha tradelar yo'q.",
+        "no_sales_in_cat": "📊 Bu kategoriyada hozircha sotuvlar yo'q.",
+        "title_min_len": "❌ Sarlavha kamida 5 ta belgi bo'lsin, qaytadan yozing:",
+        "trade_updated": "✅ Trade muvaffaqiyatli yangilandi!",
+        "sale_updated": "✅ Sotuv muvaffaqiyatli yangilandi!",
+        "edit_name_prompt": "✏️ Yangi nomni yozing:",
+        "edit_photo_prompt": "📸 Yangi rasm yuboring (o'tkazib yuborish ham mumkin):",
+        "edit_bio_prompt": "📝 Yangi bio yozing:",
+        "edit_price_prompt": "💰 Yangi narxni kiriting (faqat raqam):",
+        "only_number": "❌ Faqat raqam kiriting:",
+        "choose_currency": "💱 Valyutani tanlang:",
+        "currency_som": "💵 So'm (UZS)",
+        "currency_robux": "🪙 Robux",
+        "price_prompt": "💰 Narxni yozing ({cur} da):",
+        "no_permission": "❌ Sizda ruxsat yo'q!",
     },
     "en": {
         "flag": "🇺🇸", "name": "English",
@@ -153,6 +184,36 @@ LANGS = {
         "add_cart": "🛒 Add to Cart",
         "trade_label": "🔄 TRADE",
         "sale_label": "🛍 SALE",
+        "btn_roblox_script": "🎮 Roblox Script",
+        "roblox_script_msg": "🎮 *Roblox Scripts*\n\nTo get the latest working scripts, go to our channel below:",
+        "btn_roblox_script_link": "📂 Scripts Channel",
+        "btn_scammers": "🚨 Scammers",
+        "scam_menu_msg": "🚨 *Scammers section*\n\nHere you can check information about users who have scammed others.",
+        "btn_scam_view": "👀 View scammers",
+        "btn_scam_search": "🔍 Search",
+        "scam_search_prompt": "🔍 Enter the @username of the user you want to check:",
+        "scam_write_username": "✍️ Write @username:",
+        "no_scammers": "🚨 The scammers list is currently empty.",
+        "scam_not_found": "✅ This user was not found in the scammers list.",
+        "scam_found_warn": "⚠️ *WARNING!* This user is on the scammers list!",
+        "choose_trade_category": "🔄 Which game's trades do you want to see?\n\nChoose a category:",
+        "choose_sale_category": "📊 Which game's sales do you want to see?\n\nChoose a category:",
+        "back_to_categories": "🔙 Categories",
+        "no_trades_in_cat": "🔄 There are no trades in this category yet.",
+        "no_sales_in_cat": "📊 There are no sales in this category yet.",
+        "title_min_len": "❌ Title must be at least 5 characters, write again:",
+        "trade_updated": "✅ Trade updated successfully!",
+        "sale_updated": "✅ Sale updated successfully!",
+        "edit_name_prompt": "✏️ Write the new name:",
+        "edit_photo_prompt": "📸 Send a new photo (you can also skip):",
+        "edit_bio_prompt": "📝 Write the new bio:",
+        "edit_price_prompt": "💰 Enter the new price (numbers only):",
+        "only_number": "❌ Please enter a number:",
+        "choose_currency": "💱 Choose currency:",
+        "currency_som": "💵 Som (UZS)",
+        "currency_robux": "🪙 Robux",
+        "price_prompt": "💰 Write the price (in {cur}):",
+        "no_permission": "❌ You don't have permission!",
     },
     "ru": {
         "flag": "🇷🇺", "name": "Русский",
@@ -199,6 +260,36 @@ LANGS = {
         "add_cart": "🛒 В корзину",
         "trade_label": "🔄 ТРЕЙД",
         "sale_label": "🛍 ПРОДАЖА",
+        "btn_roblox_script": "🎮 Roblox Скрипт",
+        "roblox_script_msg": "🎮 *Roblox Скрипты*\n\nЧтобы получить последние рабочие скрипты, перейдите в наш канал ниже:",
+        "btn_roblox_script_link": "📂 Канал со скриптами",
+        "btn_scammers": "🚨 Мошенники",
+        "scam_menu_msg": "🚨 *Раздел мошенников*\n\nЗдесь вы можете проверить информацию о пользователях, которые обманывали других.",
+        "btn_scam_view": "👀 Посмотреть мошенников",
+        "btn_scam_search": "🔍 Поиск",
+        "scam_search_prompt": "🔍 Введите @username пользователя, которого хотите проверить:",
+        "scam_write_username": "✍️ Напишите @username:",
+        "no_scammers": "🚨 Список мошенников пока пуст.",
+        "scam_not_found": "✅ Этот пользователь не найден в списке мошенников.",
+        "scam_found_warn": "⚠️ *ВНИМАНИЕ!* Этот пользователь есть в списке мошенников!",
+        "choose_trade_category": "🔄 Трейды какой игры вы хотите посмотреть?\n\nВыберите категорию:",
+        "choose_sale_category": "📊 Продажи какой игры вы хотите посмотреть?\n\nВыберите категорию:",
+        "back_to_categories": "🔙 Категории",
+        "no_trades_in_cat": "🔄 В этой категории пока нет трейдов.",
+        "no_sales_in_cat": "📊 В этой категории пока нет продаж.",
+        "title_min_len": "❌ Заголовок должен быть не менее 5 символов, напишите снова:",
+        "trade_updated": "✅ Трейд успешно обновлён!",
+        "sale_updated": "✅ Продажа успешно обновлена!",
+        "edit_name_prompt": "✏️ Напишите новое название:",
+        "edit_photo_prompt": "📸 Отправьте новое фото (можно пропустить):",
+        "edit_bio_prompt": "📝 Напишите новое описание:",
+        "edit_price_prompt": "💰 Введите новую цену (только цифры):",
+        "only_number": "❌ Введите только число:",
+        "choose_currency": "💱 Выберите валюту:",
+        "currency_som": "💵 Сум (UZS)",
+        "currency_robux": "🪙 Robux",
+        "price_prompt": "💰 Напишите цену (в {cur}):",
+        "no_permission": "❌ У вас нет прав!",
     }
 }
 
@@ -226,6 +317,7 @@ online_traders = mdb["online_traders"]
 mutes_db       = mdb["mutes"]
 trade_cart     = mdb["trade_cart"]
 sale_cart      = mdb["sale_cart"]
+scammers       = mdb["scammers"]
 
 async def init_indexes():
     await users.create_index("user_id", unique=True)
@@ -238,6 +330,7 @@ async def init_indexes():
     await cooldowns.create_index([("user_id", 1), ("action", 1)], unique=True)
     await online_traders.create_index("user_id", unique=True)
     await mutes_db.create_index("user_id", unique=True)
+    await scammers.create_index("tgid_norm")
 
 # ═══════════════════════════════════════════════════════
 # HELPERS
@@ -372,10 +465,12 @@ async def add_trade(uid, uname, nick, name, bio, photo_id, lang="uz", game=""):
 async def get_trade(tid):
     return await trades.find_one({"_id": ObjectId(str(tid))})
 
-async def active_trades(lang=None):
+async def active_trades(lang=None, game=None):
     query = {"status": "active"}
     if lang:
         query["lang"] = lang
+    if game:
+        query["game"] = game
     return [t async for t in trades.find(query).sort("_id", -1)]
 
 async def my_trades(uid):
@@ -403,10 +498,12 @@ async def add_sale(uid, uname, nick, name, bio, photo_id, currency, price, lang=
 async def get_sale(sid):
     return await sales.find_one({"_id": ObjectId(str(sid))})
 
-async def active_sales(lang=None):
+async def active_sales(lang=None, game=None):
     query = {"status": "active"}
     if lang:
         query["lang"] = lang
+    if game:
+        query["game"] = game
     return [s async for s in sales.find(query).sort("_id", -1)]
 
 async def my_sales(uid):
@@ -452,6 +549,36 @@ async def set_trader_status(uid: int, is_online: bool):
         {"user_id": uid},
         {"$set": {"is_online": is_online}}
     )
+
+# ═══════════════════════════════════════════════════════
+# MASHKALAR (SCAMMERS) DB HELPERS
+# ═══════════════════════════════════════════════════════
+async def add_scammer(nick: str, tgid: str, photo_id, added_by: int):
+    norm = tgid.strip().lstrip("@").lower()
+    r = await scammers.insert_one({
+        "nick": nick.strip(),
+        "tgid": tgid.strip(),
+        "tgid_norm": norm,
+        "photo_id": photo_id,
+        "added_by": added_by,
+        "created_at": now()
+    })
+    return r.inserted_id
+
+async def get_scammer(sid):
+    return await scammers.find_one({"_id": ObjectId(str(sid))})
+
+async def all_scammers():
+    return [s async for s in scammers.find({}).sort("_id", -1)]
+
+async def find_scammers_by_username(query: str):
+    norm = query.strip().lstrip("@").lower()
+    if not norm:
+        return []
+    return [s async for s in scammers.find({"tgid_norm": norm})]
+
+async def delete_scammer(sid):
+    await scammers.delete_one({"_id": ObjectId(str(sid))})
 
 # ═══════════════════════════════════════════════════════
 # SAVAT DB HELPERS
@@ -557,6 +684,17 @@ class Broadcast(StatesGroup):
 
 class AdminCmd(StatesGroup):
     add_balance = State()
+    sub_balance = State()
+    quick_add_balance = State()
+    quick_sub_balance = State()
+
+class ScammerAdd(StatesGroup):
+    nick  = State()
+    tgid  = State()
+    photo = State()
+
+class ScammerSearch(StatesGroup):
+    query = State()
 
 class ContactAdmin(StatesGroup):
     photo   = State()
@@ -651,8 +789,10 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_suggest"))
     b.button(text=T(lang, "btn_search"))
     b.button(text=T(lang, "btn_autoxabar"))
+    b.button(text=T(lang, "btn_roblox_script"))
+    b.button(text=T(lang, "btn_scammers"))
     b.button(text=T(lang, "btn_change_lang"))
-    b.adjust(2, 2, 2, 2, 2, 1, 2, 1, 1, 1)
+    b.adjust(2, 2, 2, 2, 2, 1, 2, 1, 1, 1, 2, 1)
     return b.as_markup(resize_keyboard=True)
 
 def cancel_kb(lang="uz"):
@@ -671,6 +811,22 @@ def game_kb(prefix="tgame"):
     b = InlineKeyboardBuilder()
     for key, label in GAME_CATEGORIES:
         b.button(text=label, callback_data=f"{prefix}_{key}")
+    b.adjust(2)
+    return b.as_markup()
+
+async def trade_category_kb(lang="uz"):
+    b = InlineKeyboardBuilder()
+    for key, label in GAME_CATEGORIES:
+        cnt = await trades.count_documents({"status": "active", "lang": lang, "game": key})
+        b.button(text=f"{label} ({cnt})", callback_data=f"tcat_{key}")
+    b.adjust(2)
+    return b.as_markup()
+
+async def sale_category_kb(lang="uz"):
+    b = InlineKeyboardBuilder()
+    for key, label in GAME_CATEGORIES:
+        cnt = await sales.count_documents({"status": "active", "lang": lang, "game": key})
+        b.button(text=f"{label} ({cnt})", callback_data=f"scat_{key}")
     b.adjust(2)
     return b.as_markup()
 
@@ -1326,9 +1482,32 @@ async def cmd_trades(msg: types.Message, state: FSMContext):
     if not items:
         await msg.answer(T(lang, "no_trades"))
         return
-    await _send_trade_page(msg, items, 0, is_cb=False, lang=lang)
+    await msg.answer(T(lang, "choose_trade_category"), reply_markup=await trade_category_kb(lang))
 
-async def _send_trade_page(target, items, page, is_cb=True, lang="uz"):
+@dp.callback_query(F.data.startswith("tcat_") & (F.data != "tcat_back"))
+async def cb_tcat(cb: types.CallbackQuery):
+    uid  = cb.from_user.id
+    lang = await get_user_lang(uid)
+    game = cb.data[len("tcat_"):]
+    items = await active_trades(lang, game)
+    if not items:
+        await cb.answer(T(lang, "no_trades_in_cat"), show_alert=True)
+        return
+    await _send_trade_page(cb, items, 0, lang=lang, game=game)
+    await cb.answer()
+
+@dp.callback_query(F.data == "tcat_back")
+async def cb_tcat_back(cb: types.CallbackQuery):
+    uid  = cb.from_user.id
+    lang = await get_user_lang(uid)
+    try:
+        await cb.message.delete()
+    except Exception:
+        pass
+    await cb.message.answer(T(lang, "choose_trade_category"), reply_markup=await trade_category_kb(lang))
+    await cb.answer()
+
+async def _send_trade_page(target, items, page, is_cb=True, lang="uz", game=""):
     t       = items[page]
     game_label = GAME_LABELS.get(t.get("game", ""), "")
     caption = (
@@ -1344,14 +1523,16 @@ async def _send_trade_page(target, items, page, is_cb=True, lang="uz"):
     caption += f"📅 {t['created_at']}\n━━━━━━━━━━━━━━━━━━━━"
     b = InlineKeyboardBuilder()
     if page > 0:
-        b.button(text=T(lang, "prev"), callback_data=f"tp_{page-1}")
+        b.button(text=T(lang, "prev"), callback_data=f"tp_{game}_{page-1}")
     if page < len(items) - 1:
-        b.button(text=T(lang, "next"), callback_data=f"tp_{page+1}")
+        b.button(text=T(lang, "next"), callback_data=f"tp_{game}_{page+1}")
     uname = t.get("username", "")
     if uname:
         b.button(text=T(lang, "contact_btn"), url=f"https://t.me/{uname}")
     b.button(text=T(lang, "add_cart"), callback_data=f"add_trade_cart_{t['_id']}")
-    b.adjust(2, 1, 1)
+    if game:
+        b.button(text=T(lang, "back_to_categories"), callback_data="tcat_back")
+    b.adjust(2, 1, 1, 1)
     if is_cb:
         await _send_or_edit(target, t.get("photo_id"), caption, b.as_markup())
     else:
@@ -1364,13 +1545,15 @@ async def _send_trade_page(target, items, page, is_cb=True, lang="uz"):
 async def cb_tp(cb: types.CallbackQuery):
     uid   = cb.from_user.id
     lang  = await get_user_lang(uid)
-    page  = int(cb.data.split("_")[1])
-    items = await active_trades(lang)
+    rest  = cb.data[len("tp_"):]
+    game, _, page_s = rest.rpartition("_")
+    page  = int(page_s)
+    items = await active_trades(lang, game or None)
     if not items:
-        await cb.answer("Tradelar yo'q!", show_alert=True)
+        await cb.answer(T(lang, "no_trades"), show_alert=True)
         return
     page = max(0, min(page, len(items) - 1))
-    await _send_trade_page(cb, items, page, lang=lang)
+    await _send_trade_page(cb, items, page, lang=lang, game=game)
     await cb.answer()
 
 # ── Trade qo'shish ─────────────────────────────────────
@@ -1402,7 +1585,7 @@ async def ta_name(msg: types.Message, state: FSMContext):
         await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
     if len(msg.text.strip()) < 5:
-        await msg.answer("❌ Sarlavha kamida 5 ta belgi bo'lsin:")
+        await msg.answer(T(lang, "title_min_len"))
         return
     await state.update_data(t_name=msg.text.strip())
     await msg.answer(T(lang, "photo_prompt"), reply_markup=skip_cancel_kb(lang))
@@ -1459,7 +1642,7 @@ async def cb_etrade(cb: types.CallbackQuery, state: FSMContext):
         await cb.answer("Ruxsat yo'q!", show_alert=True)
         return
     await state.update_data(edit_trade_id=tid)
-    await cb.message.answer("✏️ Yangi nom yozing:", reply_markup=cancel_kb(lang))
+    await cb.message.answer(T(lang, "edit_name_prompt"), reply_markup=cancel_kb(lang))
     await state.set_state(TradeEdit.name)
     await cb.answer()
 
@@ -1472,7 +1655,7 @@ async def etrade_name(msg: types.Message, state: FSMContext):
         await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
     await state.update_data(new_name=msg.text.strip())
-    await msg.answer("📸 Yangi rasm yuboring (o'tkazib yuborish ham mumkin):", reply_markup=skip_cancel_kb(lang))
+    await msg.answer(T(lang, "edit_photo_prompt"), reply_markup=skip_cancel_kb(lang))
     await state.set_state(TradeEdit.photo)
 
 @dp.message(TradeEdit.photo, F.photo)
@@ -1480,7 +1663,7 @@ async def etrade_photo(msg: types.Message, state: FSMContext):
     await state.update_data(new_photo=msg.photo[-1].file_id)
     uid  = msg.from_user.id
     lang = await get_user_lang(uid)
-    await msg.answer("📝 Yangi bio yozing:", reply_markup=cancel_kb(lang))
+    await msg.answer(T(lang, "edit_bio_prompt"), reply_markup=cancel_kb(lang))
     await state.set_state(TradeEdit.bio)
 
 @dp.message(TradeEdit.photo)
@@ -1497,7 +1680,7 @@ async def etrade_no_photo(msg: types.Message, state: FSMContext):
     else:
         # Rasm olib tashlansin (matn yuborildi)
         await state.update_data(new_photo=None)
-    await msg.answer("📝 Yangi bio yozing:", reply_markup=cancel_kb(lang))
+    await msg.answer(T(lang, "edit_bio_prompt"), reply_markup=cancel_kb(lang))
     await state.set_state(TradeEdit.bio)
 
 @dp.message(TradeEdit.bio)
@@ -1523,7 +1706,7 @@ async def etrade_bio(msg: types.Message, state: FSMContext):
     from bson import ObjectId as ObjId
     await trades.update_one({"_id": ObjId(str(tid))}, upd)
     await state.clear()
-    await msg.answer("✅ Trade yangilandi!", reply_markup=main_kb(lang))
+    await msg.answer(T(lang, "trade_updated"), reply_markup=main_kb(lang))
 
 @dp.callback_query(F.data.startswith("dtrade_"))
 async def cb_dtrade(cb: types.CallbackQuery):
@@ -1566,9 +1749,32 @@ async def cmd_sales(msg: types.Message, state: FSMContext):
     if not items:
         await msg.answer(T(lang, "no_sales"))
         return
-    await _send_sale_page(msg, items, 0, is_cb=False, lang=lang)
+    await msg.answer(T(lang, "choose_sale_category"), reply_markup=await sale_category_kb(lang))
 
-async def _send_sale_page(target, items, page, is_cb=True, lang="uz"):
+@dp.callback_query(F.data.startswith("scat_") & (F.data != "scat_back"))
+async def cb_scat(cb: types.CallbackQuery):
+    uid  = cb.from_user.id
+    lang = await get_user_lang(uid)
+    game = cb.data[len("scat_"):]
+    items = await active_sales(lang, game)
+    if not items:
+        await cb.answer(T(lang, "no_sales_in_cat"), show_alert=True)
+        return
+    await _send_sale_page(cb, items, 0, lang=lang, game=game)
+    await cb.answer()
+
+@dp.callback_query(F.data == "scat_back")
+async def cb_scat_back(cb: types.CallbackQuery):
+    uid  = cb.from_user.id
+    lang = await get_user_lang(uid)
+    try:
+        await cb.message.delete()
+    except Exception:
+        pass
+    await cb.message.answer(T(lang, "choose_sale_category"), reply_markup=await sale_category_kb(lang))
+    await cb.answer()
+
+async def _send_sale_page(target, items, page, is_cb=True, lang="uz", game=""):
     s       = items[page]
     game_label = GAME_LABELS.get(s.get("game", ""), "")
     caption = (
@@ -1585,14 +1791,16 @@ async def _send_sale_page(target, items, page, is_cb=True, lang="uz"):
     caption += f"📅 {s['created_at']}\n━━━━━━━━━━━━━━━━━━━━"
     b = InlineKeyboardBuilder()
     if page > 0:
-        b.button(text=T(lang, "prev"), callback_data=f"sp_{page-1}")
+        b.button(text=T(lang, "prev"), callback_data=f"sp_{game}_{page-1}")
     if page < len(items) - 1:
-        b.button(text=T(lang, "next"), callback_data=f"sp_{page+1}")
+        b.button(text=T(lang, "next"), callback_data=f"sp_{game}_{page+1}")
     uname = s.get("username", "")
     if uname:
         b.button(text=T(lang, "contact_btn"), url=f"https://t.me/{uname}")
     b.button(text=T(lang, "add_cart"), callback_data=f"add_sale_cart_{s['_id']}")
-    b.adjust(2, 1, 1)
+    if game:
+        b.button(text=T(lang, "back_to_categories"), callback_data="scat_back")
+    b.adjust(2, 1, 1, 1)
     if is_cb:
         await _send_or_edit(target, s.get("photo_id"), caption, b.as_markup())
     else:
@@ -1605,13 +1813,15 @@ async def _send_sale_page(target, items, page, is_cb=True, lang="uz"):
 async def cb_sp(cb: types.CallbackQuery):
     uid   = cb.from_user.id
     lang  = await get_user_lang(uid)
-    page  = int(cb.data.split("_")[1])
-    items = await active_sales(lang)
+    rest  = cb.data[len("sp_"):]
+    game, _, page_s = rest.rpartition("_")
+    page  = int(page_s)
+    items = await active_sales(lang, game or None)
     if not items:
-        await cb.answer("Sotuvlar yo'q!", show_alert=True)
+        await cb.answer(T(lang, "no_sales"), show_alert=True)
         return
     page = max(0, min(page, len(items) - 1))
-    await _send_sale_page(cb, items, page, lang=lang)
+    await _send_sale_page(cb, items, page, lang=lang, game=game)
     await cb.answer()
 
 @dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_add_sale") for l in LANGS)))
@@ -1676,10 +1886,10 @@ async def sa_bio(msg: types.Message, state: FSMContext):
     bio = "" if msg.text == T(lang, "skip") else msg.text.strip()
     await state.update_data(s_bio=bio)
     b = InlineKeyboardBuilder()
-    b.button(text="💵 So'm (UZS)", callback_data="sc_som")
-    b.button(text="🪙 Robux",      callback_data="sc_robux")
+    b.button(text=T(lang, "currency_som"), callback_data="sc_som")
+    b.button(text=T(lang, "currency_robux"),      callback_data="sc_robux")
     b.adjust(2)
-    await msg.answer("💱 Valyutani tanlang:", reply_markup=b.as_markup())
+    await msg.answer(T(lang, "choose_currency"), reply_markup=b.as_markup())
     await state.set_state(SaleAdd.currency)
 
 @dp.callback_query(F.data.startswith("sc_"))
@@ -1688,7 +1898,7 @@ async def cb_sc(cb: types.CallbackQuery, state: FSMContext):
     lang = await get_user_lang(uid)
     cur = "so'm" if cb.data == "sc_som" else "Robux"
     await state.update_data(s_currency=cur)
-    await cb.message.answer(f"💰 Narxni yozing ({cur} da):", reply_markup=cancel_kb(lang))
+    await cb.message.answer(T(lang, "price_prompt", cur=cur), reply_markup=cancel_kb(lang))
     await state.set_state(SaleAdd.price)
     await cb.answer()
 
@@ -1702,7 +1912,7 @@ async def sa_price(msg: types.Message, state: FSMContext):
         return
     txt = msg.text.strip().replace(" ", "").replace(",", "")
     if not txt.isdigit():
-        await msg.answer("❌ Faqat raqam kiriting:")
+        await msg.answer(T(lang, "only_number"))
         return
     d     = await state.get_data()
     uname = msg.from_user.username or "user"
@@ -1725,7 +1935,7 @@ async def cb_esale(cb: types.CallbackQuery, state: FSMContext):
         await cb.answer("Ruxsat yo'q!", show_alert=True)
         return
     await state.update_data(edit_sale_id=sid)
-    await cb.message.answer("✏️ Yangi nom yozing:", reply_markup=cancel_kb(lang))
+    await cb.message.answer(T(lang, "edit_name_prompt"), reply_markup=cancel_kb(lang))
     await state.set_state(SaleEdit.name)
     await cb.answer()
 
@@ -1738,7 +1948,7 @@ async def esale_name(msg: types.Message, state: FSMContext):
         await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
     await state.update_data(new_name=msg.text.strip())
-    await msg.answer("📸 Yangi rasm yuboring (o'tkazib yuborish mumkin):", reply_markup=skip_cancel_kb(lang))
+    await msg.answer(T(lang, "edit_photo_prompt"), reply_markup=skip_cancel_kb(lang))
     await state.set_state(SaleEdit.photo)
 
 @dp.message(SaleEdit.photo, F.photo)
@@ -1746,7 +1956,7 @@ async def esale_photo(msg: types.Message, state: FSMContext):
     uid  = msg.from_user.id
     lang = await get_user_lang(uid)
     await state.update_data(new_photo=msg.photo[-1].file_id)
-    await msg.answer("💰 Yangi narx (raqam):", reply_markup=cancel_kb(lang))
+    await msg.answer(T(lang, "edit_price_prompt"), reply_markup=cancel_kb(lang))
     await state.set_state(SaleEdit.price)
 
 @dp.message(SaleEdit.photo)
@@ -1761,7 +1971,7 @@ async def esale_no_photo(msg: types.Message, state: FSMContext):
         await state.update_data(new_photo="SKIP")
     else:
         await state.update_data(new_photo=None)
-    await msg.answer("💰 Yangi narx (raqam):", reply_markup=cancel_kb(lang))
+    await msg.answer(T(lang, "edit_price_prompt"), reply_markup=cancel_kb(lang))
     await state.set_state(SaleEdit.price)
 
 @dp.message(SaleEdit.price)
@@ -1774,7 +1984,7 @@ async def esale_price(msg: types.Message, state: FSMContext):
         return
     txt = msg.text.strip().replace(" ", "")
     if not txt.isdigit():
-        await msg.answer("❌ Faqat raqam:")
+        await msg.answer(T(lang, "only_number"))
         return
     d = await state.get_data()
     photo_raw = d.get("new_photo")
@@ -1785,7 +1995,7 @@ async def esale_price(msg: types.Message, state: FSMContext):
         upd["$set"]["photo_id"] = photo_raw  # None = o'chirish, file_id = yangilash
     await sales.update_one({"_id": ObjId(str(sid))}, upd)
     await state.clear()
-    await msg.answer("✅ Sotuv yangilandi!", reply_markup=main_kb(lang))
+    await msg.answer(T(lang, "sale_updated"), reply_markup=main_kb(lang))
 
 @dp.callback_query(F.data.startswith("dsale_"))
 async def cb_dsale(cb: types.CallbackQuery):
@@ -2111,6 +2321,203 @@ async def cmd_chat(msg: types.Message, state: FSMContext):
     b = InlineKeyboardBuilder()
     b.button(text="💬 Chatga kirish", url=CHAT_LINK)
     await msg.answer("💬 Rasmiy chatimizga xush kelibsiz!", reply_markup=b.as_markup())
+
+# ═══════════════════════════════════════════════════════
+# 🎮 ROBLOX SKRIPT
+# ═══════════════════════════════════════════════════════
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_roblox_script") for l in LANGS)))
+async def cmd_roblox_script(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    b = InlineKeyboardBuilder()
+    b.button(text=T(lang, "btn_roblox_script_link"), url=ROBLOX_SCRIPT_CHANNEL)
+    b.adjust(1)
+    await msg.answer(T(lang, "roblox_script_msg"), reply_markup=b.as_markup())
+
+# ═══════════════════════════════════════════════════════
+# 🚨 MASHKALAR (SCAMMERS)
+# ═══════════════════════════════════════════════════════
+def scam_menu_kb(lang="uz"):
+    b = InlineKeyboardBuilder()
+    b.button(text=T(lang, "btn_scam_view"), callback_data="scam_list_0")
+    b.button(text=T(lang, "btn_scam_search"), callback_data="scam_search_start")
+    b.adjust(1)
+    return b.as_markup()
+
+async def _send_scammer_page(target, items, page, lang="uz", is_cb=True):
+    s = items[page]
+    caption = (
+        f"🚨 *MASHKA #{page+1}/{len(items)}*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"👤 *Nik:* {esc_md(s.get('nick','-'))}\n"
+        f"🆔 *ID/Username:* `{esc_md(s.get('tgid','-'))}`\n"
+        f"📅 {s.get('created_at','-')}\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
+    b = InlineKeyboardBuilder()
+    if page > 0:
+        b.button(text=T(lang, "prev"), callback_data=f"scam_list_{page-1}")
+    if page < len(items) - 1:
+        b.button(text=T(lang, "next"), callback_data=f"scam_list_{page+1}")
+    if isinstance(target, types.CallbackQuery) and is_admin(target.from_user.id):
+        b.button(text="🗑 O'chirish", callback_data=f"scam_del_{s['_id']}")
+    b.adjust(2, 1)
+    if is_cb:
+        await _send_or_edit(target, s.get("photo_id"), caption, b.as_markup())
+    else:
+        if s.get("photo_id"):
+            await target.answer_photo(s["photo_id"], caption=caption, reply_markup=b.as_markup())
+        else:
+            await target.answer(caption, reply_markup=b.as_markup())
+
+async def _send_scammer_result(msg: types.Message, s: dict):
+    caption = (
+        f"⚠️ *MASHKA TOPILDI!*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"👤 *Nik:* {esc_md(s.get('nick','-'))}\n"
+        f"🆔 *ID/Username:* `{esc_md(s.get('tgid','-'))}`\n"
+        f"📅 {s.get('created_at','-')}\n"
+        f"━━━━━━━━━━━━━━━━━━━━"
+    )
+    if s.get("photo_id"):
+        await msg.answer_photo(s["photo_id"], caption=caption)
+    else:
+        await msg.answer(caption)
+
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_scammers") for l in LANGS)))
+async def cmd_scammers(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    await msg.answer(T(lang, "scam_menu_msg"), reply_markup=scam_menu_kb(lang))
+
+@dp.callback_query(F.data.startswith("scam_list_"))
+async def cb_scam_list(cb: types.CallbackQuery):
+    uid  = cb.from_user.id
+    lang = await get_user_lang(uid)
+    page = int(cb.data[len("scam_list_"):])
+    items = await all_scammers()
+    if not items:
+        await cb.answer(T(lang, "no_scammers"), show_alert=True)
+        return
+    page = max(0, min(page, len(items) - 1))
+    await _send_scammer_page(cb, items, page, lang=lang)
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("scam_del_"))
+async def cb_scam_del(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        await cb.answer(T(await get_user_lang(cb.from_user.id), "no_permission"), show_alert=True)
+        return
+    sid = cb.data[len("scam_del_"):]
+    await delete_scammer(sid)
+    try:
+        if cb.message.photo:
+            await cb.message.edit_caption("🗑 O'chirildi.")
+        else:
+            await cb.message.edit_text("🗑 O'chirildi.")
+    except Exception:
+        pass
+    await cb.answer("✅ O'chirildi!")
+
+@dp.callback_query(F.data == "scam_search_start")
+async def cb_scam_search_start(cb: types.CallbackQuery, state: FSMContext):
+    uid  = cb.from_user.id
+    lang = await get_user_lang(uid)
+    await cb.message.answer(T(lang, "scam_write_username"), reply_markup=cancel_kb(lang))
+    await state.set_state(ScammerSearch.query)
+    await cb.answer()
+
+@dp.message(ScammerSearch.query)
+async def scam_search_handler(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    query = msg.text.strip()
+    await state.clear()
+    results = await find_scammers_by_username(query)
+    if not results:
+        await msg.answer(T(lang, "scam_not_found"), reply_markup=main_kb(lang))
+        return
+    await msg.answer(T(lang, "scam_found_warn"))
+    for s in results:
+        await _send_scammer_result(msg, s)
+    await msg.answer("✅", reply_markup=main_kb(lang))
+
+# ── Admin: Mashka qo'shish ──────────────────────────────
+@dp.callback_query(F.data == "adm_addscam")
+async def adm_addscam(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    await cb.message.answer("✏️ Mashka (firibgar) nikini yozing:", reply_markup=cancel_kb())
+    await state.set_state(ScammerAdd.nick)
+    await cb.answer()
+
+@dp.message(ScammerAdd.nick)
+async def scam_add_nick(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    await state.update_data(scam_nick=msg.text.strip())
+    await msg.answer("🆔 Foydalanuvchi ID yoki @username kiriting:", reply_markup=cancel_kb(lang))
+    await state.set_state(ScammerAdd.tgid)
+
+@dp.message(ScammerAdd.tgid)
+async def scam_add_tgid(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    await state.update_data(scam_tgid=msg.text.strip())
+    await msg.answer(T(lang, "photo_prompt"), reply_markup=skip_cancel_kb(lang))
+    await state.set_state(ScammerAdd.photo)
+
+@dp.message(ScammerAdd.photo, F.photo)
+async def scam_add_photo(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    d    = await state.get_data()
+    sid  = await add_scammer(d["scam_nick"], d["scam_tgid"], msg.photo[-1].file_id, uid)
+    await state.clear()
+    await msg.answer(f"✅ Mashka qo'shildi! #{short_id(sid)}", reply_markup=main_kb(lang))
+
+@dp.message(ScammerAdd.photo)
+async def scam_add_no_photo(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    d    = await state.get_data()
+    sid  = await add_scammer(d["scam_nick"], d["scam_tgid"], None, uid)
+    await state.clear()
+    await msg.answer(f"✅ Mashka qo'shildi! #{short_id(sid)}", reply_markup=main_kb(lang))
+
+@dp.callback_query(F.data.startswith("adm_scamlist_"))
+async def adm_scamlist(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    lang  = await get_user_lang(cb.from_user.id)
+    page  = int(cb.data[len("adm_scamlist_"):])
+    items = await all_scammers()
+    if not items:
+        await cb.answer(T(lang, "no_scammers"), show_alert=True)
+        return
+    page = max(0, min(page, len(items) - 1))
+    await _send_scammer_page(cb, items, page, lang=lang)
+    await cb.answer()
 
 # ═══════════════════════════════════════════════════════
 # SHARTNOMA QILISH
@@ -2565,29 +2972,37 @@ async def mute_remaining(uid: int) -> str:
 # ═══════════════════════════════════════════════════════
 # ADMIN PANEL
 # ═══════════════════════════════════════════════════════
-@dp.message(Command("admin"))
-async def cmd_admin(msg: types.Message):
-    if not is_admin(msg.from_user.id):
-        await msg.answer("❌ Ruxsat yo'q!")
-        return
+async def admin_panel_kb():
     tr  = await active_trades()
     sl  = await active_sales()
     or_ = await pending_orders()
     cnt = await users_count()
+    scam_cnt = len(await all_scammers())
     b   = InlineKeyboardBuilder()
     b.button(text=f"📦 Buyurtmalar ({len(or_)})", callback_data="adm_ord")
     b.button(text=f"🔄 Tradelar ({len(tr)})",     callback_data="adm_tr")
     b.button(text=f"🛍 Sotuvlar ({len(sl)})",      callback_data="adm_sl")
     b.button(text="📢 Broadcast",                  callback_data="adm_bc")
     b.button(text="➕ Balans qo'shish",            callback_data="adm_addbal")
+    b.button(text="➖ Balans ayirish",             callback_data="adm_subbal")
     b.button(text="🔇 Mute berish",                callback_data="adm_mute")
     b.button(text="👥 Foydalanuvchilar",           callback_data="adm_users_0")
-    b.adjust(2, 2, 2, 1)
+    b.button(text=f"🚨 Mashka qo'shish",           callback_data="adm_addscam")
+    b.button(text=f"🚨 Mashkalar ({scam_cnt})",    callback_data="adm_scamlist_0")
+    b.adjust(2, 2, 2, 1, 2)
+    return b.as_markup(), cnt, or_, tr, sl
+
+@dp.message(Command("admin"))
+async def cmd_admin(msg: types.Message):
+    if not is_admin(msg.from_user.id):
+        await msg.answer("❌ Ruxsat yo'q!")
+        return
+    markup, cnt, or_, tr, sl = await admin_panel_kb()
     await msg.answer(
         f"🛠 *Admin Panel*\n\n👥 Foydalanuvchilar: *{cnt}*\n"
         f"📦 Kutayotgan buyurtmalar: *{len(or_)}*\n"
         f"🔄 Faol tradelar: *{len(tr)}*\n🛍 Faol sotuvlar: *{len(sl)}*",
-        reply_markup=b.as_markup()
+        reply_markup=markup
     )
 
 @dp.callback_query(F.data == "adm_ord")
@@ -2683,6 +3098,41 @@ async def admin_addbalance(msg: types.Message, state: FSMContext):
     uid  = msg.from_user.id
     lang = await get_user_lang(uid)
     await msg.answer(f"✅ {uid_t} ga {amt:,} so'm qo'shildi.", reply_markup=main_kb(lang))
+
+@dp.callback_query(F.data == "adm_subbal")
+async def adm_subbal(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    await cb.message.answer("➖ Format: `<user_id> <summa>`\nMasalan: `123456789 50000`", reply_markup=cancel_kb())
+    await state.set_state(AdminCmd.sub_balance)
+    await cb.answer()
+
+@dp.message(AdminCmd.sub_balance)
+async def admin_subbalance(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel") or msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    parts = msg.text.strip().split()
+    if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+        await msg.answer("❌ Format: `<user_id> <summa>`")
+        return
+    uid_t, amt = int(parts[0]), int(parts[1])
+    cur_bal = await get_balance(uid_t)
+    new_bal = max(0, cur_bal - amt)
+    deducted = cur_bal - new_bal
+    await users.update_one({"user_id": uid_t}, {"$set": {"balance": new_bal}})
+    user_lang = await get_user_lang(uid_t)
+    try:
+        await bot.send_message(uid_t, f"💸 Hisobingizdan *{deducted:,} so'm* ayirildi.\n💰 Qolgan balans: *{new_bal:,} so'm*", reply_markup=main_kb(user_lang))
+    except Exception:
+        pass
+    await state.clear()
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    await msg.answer(f"✅ {uid_t} dan {deducted:,} so'm ayirildi.\n💰 Qolgan balans: {new_bal:,} so'm.", reply_markup=main_kb(lang))
 
 @dp.message(Command("addbalance"))
 async def cmd_addbalance(msg: types.Message):
@@ -2984,6 +3434,7 @@ async def adm_user_detail(cb: types.CallbackQuery):
     else:
         b.button(text="🔇 Mute berish", callback_data=f"adm_mute_user_{uid_target}")
     b.button(text="💰 Balans qo'shish", callback_data=f"adm_bal_{uid_target}")
+    b.button(text="➖ Balans ayirish", callback_data=f"adm_subq_{uid_target}")
     b.button(text="🔙 Orqaga", callback_data="adm_users_0")
     b.adjust(1)
     try:
@@ -3017,35 +3468,87 @@ async def adm_bal_quick(cb: types.CallbackQuery, state: FSMContext):
         f"💰 {uid_target} foydalanuvchiga necha so'm qo'shish?\n_(raqam kiriting)_:",
         reply_markup=cancel_kb()
     )
-    await state.set_state(AdminCmd.add_balance)
+    await state.set_state(AdminCmd.quick_add_balance)
     await cb.answer()
+
+@dp.message(AdminCmd.quick_add_balance)
+async def admin_quick_addbalance(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel") or msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = msg.text.strip().replace(" ", "")
+    if not txt.isdigit():
+        await msg.answer(T(lang, "only_number"))
+        return
+    d = await state.get_data()
+    uid_t = d.get("quick_bal_uid")
+    amt = int(txt)
+    await users.update_one({"user_id": uid_t}, {"$inc": {"balance": amt}})
+    user_lang = await get_user_lang(uid_t)
+    try:
+        await bot.send_message(uid_t, f"💰 Hisobingizga *{amt:,} so'm* qo'shildi!", reply_markup=main_kb(user_lang))
+    except Exception:
+        pass
+    await state.clear()
+    await msg.answer(f"✅ {uid_t} ga {amt:,} so'm qo'shildi.", reply_markup=main_kb(lang))
+
+@dp.callback_query(F.data.startswith("adm_subq_"))
+async def adm_subq_quick(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    uid_target = int(cb.data[len("adm_subq_"):])
+    await state.update_data(quick_bal_uid=uid_target)
+    await cb.message.answer(
+        f"➖ {uid_target} foydalanuvchidan necha so'm ayirish?\n_(raqam kiriting)_:",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(AdminCmd.quick_sub_balance)
+    await cb.answer()
+
+@dp.message(AdminCmd.quick_sub_balance)
+async def admin_quick_subbalance(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel") or msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = msg.text.strip().replace(" ", "")
+    if not txt.isdigit():
+        await msg.answer(T(lang, "only_number"))
+        return
+    d = await state.get_data()
+    uid_t = d.get("quick_bal_uid")
+    amt = int(txt)
+    cur_bal = await get_balance(uid_t)
+    new_bal = max(0, cur_bal - amt)
+    deducted = cur_bal - new_bal
+    await users.update_one({"user_id": uid_t}, {"$set": {"balance": new_bal}})
+    user_lang = await get_user_lang(uid_t)
+    try:
+        await bot.send_message(uid_t, f"💸 Hisobingizdan *{deducted:,} so'm* ayirildi.\n💰 Qolgan balans: *{new_bal:,} so'm*", reply_markup=main_kb(user_lang))
+    except Exception:
+        pass
+    await state.clear()
+    await msg.answer(f"✅ {uid_t} dan {deducted:,} so'm ayirildi.\n💰 Qolgan balans: {new_bal:,} so'm.", reply_markup=main_kb(lang))
 
 @dp.callback_query(F.data == "adm_back")
 async def adm_back(cb: types.CallbackQuery):
     if not is_admin(cb.from_user.id):
         return
-    tr  = await active_trades()
-    sl  = await active_sales()
-    or_ = await pending_orders()
-    cnt = await users_count()
-    b   = InlineKeyboardBuilder()
-    b.button(text=f"📦 Buyurtmalar ({len(or_)})", callback_data="adm_ord")
-    b.button(text=f"🔄 Tradelar ({len(tr)})",     callback_data="adm_tr")
-    b.button(text=f"🛍 Sotuvlar ({len(sl)})",      callback_data="adm_sl")
-    b.button(text="📢 Broadcast",                  callback_data="adm_bc")
-    b.button(text="➕ Balans qo'shish",            callback_data="adm_addbal")
-    b.button(text="🔇 Mute berish",                callback_data="adm_mute")
-    b.button(text="👥 Foydalanuvchilar",           callback_data="adm_users_0")
-    b.adjust(2, 2, 2, 1)
+    markup, cnt, or_, tr, sl = await admin_panel_kb()
     try:
         await cb.message.edit_text(
             f"🛠 *Admin Panel*\n\n👥 Foydalanuvchilar: *{cnt}*\n"
             f"📦 Kutayotgan buyurtmalar: *{len(or_)}*\n"
             f"🔄 Faol tradelar: *{len(tr)}*\n🛍 Faol sotuvlar: *{len(sl)}*",
-            reply_markup=b.as_markup()
+            reply_markup=markup
         )
     except Exception:
-        await cb.message.answer(f"🛠 *Admin Panel*\n\n👥 Foydalanuvchilar: *{cnt}*", reply_markup=b.as_markup())
+        await cb.message.answer(f"🛠 *Admin Panel*\n\n👥 Foydalanuvchilar: *{cnt}*", reply_markup=markup)
     await cb.answer()
 
 # ═══════════════════════════════════════════════════════
