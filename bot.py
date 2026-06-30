@@ -32,12 +32,62 @@ CARD_OWNER        = os.getenv("CARD_OWNER", "Nurboyev.N")
 CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_chat_veko")
 ROBLOX_SCRIPT_CHANNEL = os.getenv("ROBLOX_SCRIPT_CHANNEL", "https://t.me/deltauzbrb")
 
-ADMIN_IDS = {8325726426, 8667862086, 8866852203, 7405798326}
+ADMIN_IDS = {8866852203}
 
 def is_admin(uid: int) -> bool:
-    return uid in ADMIN_IDS
+    return uid in ADMIN_IDS or ADMIN_ROLES.get(uid) == "super"
 
 ADMIN_ID = 8667862086
+
+# ═══════════════════════════════════════════════════════
+# ADMIN ROLLARI TIZIMI (Super / Referal / Robux / Mashkalar)
+# ═══════════════════════════════════════════════════════
+ROBUX_ADMIN_CONTACT = "@robuxmarketadmin"
+
+ADMIN_ROLE_LABELS = {
+    "super":    "👑 Super admin",
+    "referral": "🎁 Referal admin",
+    "robux":    "🪙 Robux admin",
+    "mashka":   "🚨 Mashkalar admin",
+}
+
+# Xotirada keshlanadigan rollar: {user_id: role}
+ADMIN_ROLES: dict[int, str] = {}
+
+async def load_admin_roles():
+    global ADMIN_ROLES
+    fresh = {}
+    async for a in admins_col.find({}):
+        fresh[a["user_id"]] = a["role"]
+    ADMIN_ROLES = fresh
+
+async def add_admin_role(uid: int, role: str):
+    await admins_col.update_one({"user_id": uid}, {"$set": {"user_id": uid, "role": role}}, upsert=True)
+    ADMIN_ROLES[uid] = role
+
+async def remove_admin_role(uid: int):
+    await admins_col.delete_one({"user_id": uid})
+    ADMIN_ROLES.pop(uid, None)
+
+def is_super_admin(uid: int) -> bool:
+    return uid in ADMIN_IDS or ADMIN_ROLES.get(uid) == "super"
+
+def is_referral_admin(uid: int) -> bool:
+    return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "referral"
+
+def is_robux_admin(uid: int) -> bool:
+    return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "robux"
+
+def is_mashka_admin(uid: int) -> bool:
+    return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "mashka"
+
+def is_any_admin(uid: int) -> bool:
+    return is_super_admin(uid) or uid in ADMIN_ROLES
+
+def get_admin_role(uid: int) -> str | None:
+    if uid in ADMIN_IDS:
+        return "super"
+    return ADMIN_ROLES.get(uid)
 
 # ═══════════════════════════════════════════════════════
 # O'YIN KATEGORIYALARI
@@ -66,6 +116,7 @@ LANGS = {
         "btn_deposit": "💰 Hisob to'ldirish",
         "btn_trades": "🔄 Tradelar",
         "btn_sales": "📊 Sotuvlar",
+        "btn_duel": "⚔️ Duel qo'shish",
         "btn_add_trade": "➕ Trade qo'shish",
         "btn_add_sale": "➕ Sotish qo'shish",
         "btn_online": "🌐 Online Traderlar",
@@ -73,7 +124,7 @@ LANGS = {
         "btn_chat": "💬 Chat",
         "btn_contract": "📜 Shartnoma qilish",
         "btn_ad": "📣 Reklama qilish",
-        "btn_admin_service": "🛡 Adminlik xizmati",
+        "btn_admin_service": "🛡 Trade qilib berish",
         "btn_suggest": "💡 Taklif berish",
         "btn_search": "🔍 Qidiruv",
         "btn_referral": "🎁 Referal",
@@ -142,6 +193,7 @@ LANGS = {
         "btn_deposit": "💰 Top up balance",
         "btn_trades": "🔄 Trades",
         "btn_sales": "📊 Sales",
+        "btn_duel": "⚔️ Add Duel",
         "btn_add_trade": "➕ Add Trade",
         "btn_add_sale": "➕ Add Sale",
         "btn_online": "🌐 Online Traders",
@@ -149,7 +201,7 @@ LANGS = {
         "btn_chat": "💬 Chat",
         "btn_contract": "📜 Make Contract",
         "btn_ad": "📣 Advertise",
-        "btn_admin_service": "🛡 Admin Service",
+        "btn_admin_service": "🛡 Trade for you",
         "btn_suggest": "💡 Suggestion",
         "btn_search": "🔍 Search",
         "btn_referral": "🎁 Referral",
@@ -218,6 +270,7 @@ LANGS = {
         "btn_deposit": "💰 Пополнить баланс",
         "btn_trades": "🔄 Трейды",
         "btn_sales": "📊 Продажи",
+        "btn_duel": "⚔️ Добавить дуэль",
         "btn_add_trade": "➕ Добавить трейд",
         "btn_add_sale": "➕ Добавить продажу",
         "btn_online": "🌐 Онлайн трейдеры",
@@ -225,7 +278,7 @@ LANGS = {
         "btn_chat": "💬 Чат",
         "btn_contract": "📜 Заключить контракт",
         "btn_ad": "📣 Реклама",
-        "btn_admin_service": "🛡 Услуги админа",
+        "btn_admin_service": "🛡 Трейд за вас",
         "btn_suggest": "💡 Предложение",
         "btn_search": "🔍 Поиск",
         "btn_referral": "🎁 Реферал",
@@ -311,6 +364,7 @@ mutes_db       = mdb["mutes"]
 trade_cart     = mdb["trade_cart"]
 sale_cart      = mdb["sale_cart"]
 scammers       = mdb["scammers"]
+admins_col     = mdb["admins"]
 
 async def init_indexes():
     await users.create_index("user_id", unique=True)
@@ -724,6 +778,11 @@ class TradeAdd(StatesGroup):
     photo = State()
     bio   = State()
 
+class DuelAdd(StatesGroup):
+    photo = State()
+    nick  = State()
+    bio   = State()
+
 class TradeEdit(StatesGroup):
     name  = State()
     photo = State()
@@ -755,6 +814,9 @@ class AdminCmd(StatesGroup):
     sub_balance = State()
     quick_add_balance = State()
     quick_sub_balance = State()
+
+class AdminRoleAdd(StatesGroup):
+    user_id = State()
 
 class ScammerAdd(StatesGroup):
     nick  = State()
@@ -845,6 +907,7 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_deposit"))
     b.button(text=T(lang, "btn_trades"))
     b.button(text=T(lang, "btn_sales"))
+    b.button(text=T(lang, "btn_duel"))
     b.button(text=T(lang, "btn_add_trade"))
     b.button(text=T(lang, "btn_add_sale"))
     b.button(text=T(lang, "btn_online"))
@@ -859,7 +922,7 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_roblox_script"))
     b.button(text=T(lang, "btn_scammers"))
     b.button(text=T(lang, "btn_change_lang"))
-    b.adjust(2, 2, 2, 2, 2, 1, 2, 1, 1, 1, 2, 1)
+    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2)
     return b.as_markup(resize_keyboard=True)
 
 def cancel_kb(lang="uz"):
@@ -967,6 +1030,21 @@ async def notify_admins(text: str, photo_id=None, markup=None):
         except Exception as e:
             logging.error(f"Admin {aid} ga xabar yuborishda xato: {e}")
 
+async def notify_role_admins(role: str, text: str, photo_id=None, markup=None):
+    """Faqat asosiy (super) adminlar va shu rolga ega adminlarga xabar yuboradi."""
+    targets = set(ADMIN_IDS)
+    for uid, r in ADMIN_ROLES.items():
+        if r == "super" or r == role:
+            targets.add(uid)
+    for aid in targets:
+        try:
+            if photo_id:
+                await bot.send_photo(aid, photo_id, caption=text, reply_markup=markup)
+            else:
+                await bot.send_message(aid, text, reply_markup=markup)
+        except Exception as e:
+            logging.error(f"Admin {aid} ga xabar yuborishda xato: {e}")
+
 # ═══════════════════════════════════════════════════════
 # KANALGA E'LON YUBORISH
 # ═══════════════════════════════════════════════════════
@@ -1000,6 +1078,27 @@ async def post_sale_to_channel(uname: str, item_name: str, bio: str, price, curr
             await bot.send_message(TRADE_CHANNEL, caption, reply_markup=b.as_markup())
     except Exception as e:
         logging.error(f"Kanalga sotuv yuborishda xato: {e}")
+
+async def post_duel_to_channel(uname: str, nick: str, bio: str, photo_id=None):
+    caption = (
+        "⚔️ *YANGI DUEL E'LON*\n"
+        "━━━━━━━━━━━━━━━━━━━━\n\n"
+        f"1️⃣ *Foydalanuvchi:* @{esc_md(uname)}\n\n"
+        f"2️⃣ *Roblox nik:*\n{esc_md(nick)}\n\n"
+        f"3️⃣ *Bio:*\n{esc_md(bio or '—')}\n\n"
+        "4️⃣ ⚔️ *Duel*\n\n"
+        "━━━━━━━━━━━━━━━━━━━━\n"
+        f"💬 Murojaat: @{esc_md(uname)}"
+    )
+    b = InlineKeyboardBuilder()
+    b.button(text="💬 Murojaat", url=f"https://t.me/{uname}")
+    try:
+        if photo_id:
+            await bot.send_photo(TRADE_CHANNEL, photo_id, caption=caption, reply_markup=b.as_markup())
+        else:
+            await bot.send_message(TRADE_CHANNEL, caption, reply_markup=b.as_markup())
+    except Exception as e:
+        logging.error(f"Kanalga duel yuborishda xato: {e}")
 
 async def post_online_trader_to_channel(uname: str, nick: str, bio: str, photo_id=None):
     caption = (
@@ -1408,7 +1507,7 @@ async def cmd_buy(msg: types.Message, state: FSMContext):
     for key, label, price in ROBLOX_PLUS_OPTIONS:
         b.button(text=f"✨ {label} — {price:,} so'm", callback_data=f"buyplus_{key}")
     b.button(text="🆓 Free Trial — 15.000 so'm", callback_data="buy_freetrial")
-    b.adjust(3, 3, 3, 3, 1, 1, 1, 1, 1)
+    b.adjust(3, 3, 3, 3, 1, 1, 1, 1, 1, 1)
     await msg.answer(
         f"🌟 **Assalomu alaykum!**\n"
         f"💰 Balansingiz: **{bal:,} so'm**\n\n"
@@ -1416,6 +1515,40 @@ async def cmd_buy(msg: types.Message, state: FSMContext):
         f"👇 Quyidagilardan birini tanlang:",
         reply_markup=b.as_markup()
     )
+
+# ── Roblox Plus / Free Trial: hozircha to'g'ridan-to'g'ri admin orqali ────
+@dp.callback_query(F.data == "plus_noop")
+async def cb_plus_noop(cb: types.CallbackQuery):
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("buyplus_"))
+async def cb_buyplus_redirect(cb: types.CallbackQuery):
+    key = cb.data[len("buyplus_"):]
+    info = plus_price_for(key)
+    label, price = info if info else ("Roblox Plus", 0)
+    b = InlineKeyboardBuilder()
+    b.button(text="💬 Admin bilan bog'lanish", url=f"https://t.me/{ROBUX_ADMIN_CONTACT.lstrip('@')}")
+    b.adjust(1)
+    await cb.message.answer(
+        f"✨ *{label}* — {price:,} so'm\n\n"
+        f"⚠️ Bu xizmat hozircha avtomatik tarzda ishlamaydi.\n"
+        f"Buyurtma berish uchun adminga murojaat qiling: {ROBUX_ADMIN_CONTACT}",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
+
+@dp.callback_query(F.data == "buy_freetrial")
+async def cb_buy_freetrial_redirect(cb: types.CallbackQuery):
+    b = InlineKeyboardBuilder()
+    b.button(text="💬 Admin bilan bog'lanish", url=f"https://t.me/{ROBUX_ADMIN_CONTACT.lstrip('@')}")
+    b.adjust(1)
+    await cb.message.answer(
+        f"🆓 *Free Trial* — {FREE_TRIAL_PRICE:,} so'm\n\n"
+        f"⚠️ Bu xizmat hozircha avtomatik tarzda ishlamaydi.\n"
+        f"Buyurtma berish uchun adminga murojaat qiling: {ROBUX_ADMIN_CONTACT}",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
 
 @dp.callback_query(lambda cb: bool(cb.data) and cb.data.startswith("buy_") and cb.data[len("buy_"):].isdigit())
 async def cb_buy(cb: types.CallbackQuery, state: FSMContext):
@@ -1516,7 +1649,8 @@ async def cb_buy_confirm(cb: types.CallbackQuery, state: FSMContext):
     b.button(text="✅ Tasdiqlash", callback_data=f"ook_{oid}")
     b.button(text="❌ Rad etish", callback_data=f"ono_{oid}")
     b.adjust(2)
-    await notify_admins(
+    await notify_role_admins(
+        "robux",
         f"🛒 *Robux buyurtma #{short_id(oid)}*\n\n"
         f"1️⃣ Nik: `{esc_md(nick)}`\n"
         f"2️⃣ Robux: *{robux}*\n"
@@ -1539,7 +1673,7 @@ async def cb_buy_confirm(cb: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("ook_"))
 async def cb_ook(cb: types.CallbackQuery):
-    if not is_admin(cb.from_user.id):
+    if not is_robux_admin(cb.from_user.id):
         return
     oid = cb.data.split("_")[1]
     o   = await get_order(oid)
@@ -1560,7 +1694,7 @@ async def cb_ook(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("ono_"))
 async def cb_ono(cb: types.CallbackQuery):
-    if not is_admin(cb.from_user.id):
+    if not is_robux_admin(cb.from_user.id):
         return
     oid = cb.data.split("_")[1]
     o   = await get_order(oid)
@@ -1665,6 +1799,69 @@ async def cb_tp(cb: types.CallbackQuery):
     page = max(0, min(page, len(items) - 1))
     await _send_trade_page(cb, items, page, lang=lang, game=game)
     await cb.answer()
+
+# ── Duel qo'shish ───────────────────────────────────────
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_duel") for l in LANGS)))
+async def cmd_duel_add(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    await msg.answer("⚔️ Nima duel qilmoqchisiz? Rasmi:", reply_markup=skip_cancel_kb(lang))
+    await state.set_state(DuelAdd.photo)
+
+@dp.message(DuelAdd.photo, F.photo)
+async def duel_photo(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    await state.update_data(d_photo=msg.photo[-1].file_id)
+    await msg.answer("🎮 Roblox nikingizni kiriting:", reply_markup=cancel_kb(lang))
+    await state.set_state(DuelAdd.nick)
+
+@dp.message(DuelAdd.photo)
+async def duel_no_photo(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    await state.update_data(d_photo=None)
+    await msg.answer("🎮 Roblox nikingizni kiriting:", reply_markup=cancel_kb(lang))
+    await state.set_state(DuelAdd.nick)
+
+@dp.message(DuelAdd.nick)
+async def duel_nick(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    nick = msg.text.strip()
+    if len(nick) < 3:
+        await msg.answer("❌ Nik kamida 3 ta belgi bo'lsin, qaytadan kiriting:")
+        return
+    await state.update_data(d_nick=nick)
+    await msg.answer(T(lang, "bio_prompt"), reply_markup=skip_cancel_kb(lang))
+    await state.set_state(DuelAdd.bio)
+
+@dp.message(DuelAdd.bio)
+async def duel_bio(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    bio = "" if msg.text == T(lang, "skip") else msg.text.strip()
+    d        = await state.get_data()
+    uname    = msg.from_user.username or "user"
+    photo_id = d.get("d_photo")
+    nick     = d.get("d_nick", "")
+    await state.clear()
+    await post_duel_to_channel(uname, nick, bio, photo_id)
+    await msg.answer("✅ *Duel e'loningiz joylandi!*", reply_markup=main_kb(lang))
 
 # ── Trade qo'shish ─────────────────────────────────────
 @dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_add_trade") for l in LANGS)))
@@ -2563,7 +2760,7 @@ async def scam_search_handler(msg: types.Message, state: FSMContext):
 # ── Admin: Mashka qo'shish ──────────────────────────────
 @dp.callback_query(F.data == "adm_addscam")
 async def adm_addscam(cb: types.CallbackQuery, state: FSMContext):
-    if not is_admin(cb.from_user.id):
+    if not is_mashka_admin(cb.from_user.id):
         return
     await cb.message.answer("✏️ Mashka (firibgar) nikini yozing:", reply_markup=cancel_kb())
     await state.set_state(ScammerAdd.nick)
@@ -2617,7 +2814,7 @@ async def scam_add_no_photo(msg: types.Message, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("adm_scamlist_"))
 async def adm_scamlist(cb: types.CallbackQuery):
-    if not is_admin(cb.from_user.id):
+    if not is_mashka_admin(cb.from_user.id):
         return
     lang  = await get_user_lang(cb.from_user.id)
     page  = int(cb.data[len("adm_scamlist_"):])
@@ -2715,7 +2912,7 @@ async def cmd_admin_service(msg: types.Message, state: FSMContext):
     b = InlineKeyboardBuilder()
     b.button(text="📩 Adminga yozish", url="https://t.me/notalonet")
     b.adjust(1)
-    await msg.answer("🛡 *Adminlik xizmati*\n\n👤 Admin: @notalonet", reply_markup=b.as_markup())
+    await msg.answer("🛡 *Trade qilib berish xizmati*\n\n👤 Admin: @notalonet", reply_markup=b.as_markup())
 
 # ═══════════════════════════════════════════════════════
 # TAKLIF BERISH
@@ -3099,25 +3296,64 @@ async def admin_panel_kb():
     b.button(text="👥 Foydalanuvchilar",           callback_data="adm_users_0")
     b.button(text=f"🚨 Mashka qo'shish",           callback_data="adm_addscam")
     b.button(text=f"🚨 Mashkalar ({scam_cnt})",    callback_data="adm_scamlist_0")
-    b.adjust(2, 2, 2, 1, 2)
+    b.button(text="👑 Admin qo'shish",             callback_data="adm_addadmin")
+    b.adjust(2, 2, 2, 2, 2, 1)
     return b.as_markup(), cnt, or_, tr, sl
 
 @dp.message(Command("admin"))
 async def cmd_admin(msg: types.Message):
-    if not is_admin(msg.from_user.id):
+    uid = msg.from_user.id
+    if is_admin(uid):
+        markup, cnt, or_, tr, sl = await admin_panel_kb()
+        await msg.answer(
+            f"🛠 *Admin Panel*\n\n👥 Foydalanuvchilar: *{cnt}*\n"
+            f"📦 Kutayotgan buyurtmalar: *{len(or_)}*\n"
+            f"🔄 Faol tradelar: *{len(tr)}*\n🛍 Faol sotuvlar: *{len(sl)}*",
+            reply_markup=markup
+        )
+        return
+
+    role = get_admin_role(uid)
+    if role is None:
         await msg.answer("❌ Ruxsat yo'q!")
         return
-    markup, cnt, or_, tr, sl = await admin_panel_kb()
-    await msg.answer(
-        f"🛠 *Admin Panel*\n\n👥 Foydalanuvchilar: *{cnt}*\n"
-        f"📦 Kutayotgan buyurtmalar: *{len(or_)}*\n"
-        f"🔄 Faol tradelar: *{len(tr)}*\n🛍 Faol sotuvlar: *{len(sl)}*",
-        reply_markup=markup
-    )
+
+    b = InlineKeyboardBuilder()
+    if role == "referral":
+        or_ps = await private_orders_db.count_documents({"status": "pending"})
+        b.button(text=f"🎁 Referal so'rovlari ({or_ps})", callback_data="adm_psorders")
+        b.adjust(1)
+        await msg.answer(
+            f"🎁 *Referal Admin Panel*\n\n"
+            f"Bu yerda faqat referal orqali olinadigan Privat Server so'rovlarini "
+            f"tasdiqlashingiz yoki rad etishingiz mumkin.",
+            reply_markup=b.as_markup()
+        )
+    elif role == "robux":
+        ol = await pending_orders()
+        b.button(text=f"📦 Robux buyurtmalar ({len(ol)})", callback_data="adm_ord")
+        b.adjust(1)
+        await msg.answer(
+            f"🪙 *Robux Admin Panel*\n\n"
+            f"Bu yerda faqat Robux sotib olish buyurtmalarini "
+            f"tasdiqlashingiz yoki rad etishingiz mumkin.",
+            reply_markup=b.as_markup()
+        )
+    elif role == "mashka":
+        scam_cnt = len(await all_scammers())
+        b.button(text="🚨 Mashka qo'shish",        callback_data="adm_addscam")
+        b.button(text=f"🚨 Mashkalar ({scam_cnt})", callback_data="adm_scamlist_0")
+        b.adjust(1)
+        await msg.answer(
+            f"🚨 *Mashkalar Admin Panel*\n\n"
+            f"Bu yerda mashka (firibgar) qo'shishingiz va mashkalar ro'yxatini "
+            f"to'liq boshqarishingiz mumkin.",
+            reply_markup=b.as_markup()
+        )
 
 @dp.callback_query(F.data == "adm_ord")
 async def adm_ord(cb: types.CallbackQuery):
-    if not is_admin(cb.from_user.id):
+    if not is_robux_admin(cb.from_user.id):
         return
     ol = await pending_orders()
     if not ol:
@@ -3133,6 +3369,30 @@ async def adm_ord(cb: types.CallbackQuery):
             f"🎮 Nik: `{o.get('roblox_nick','-')}`\n"
             f"🪙 {o['robux_amount']} Robux — {o['price_sum']:,} so'm\n"
             f"😊 Qalaysiz: {o.get('mood','-')}\n🕐 {o['created_at']}",
+            reply_markup=b.as_markup()
+        )
+    await cb.answer()
+
+@dp.callback_query(F.data == "adm_psorders")
+async def adm_psorders(cb: types.CallbackQuery):
+    if not is_referral_admin(cb.from_user.id):
+        return
+    ol = [o async for o in private_orders_db.find({"status": "pending"}).sort("_id", -1).limit(10)]
+    if not ol:
+        await cb.answer("Kutayotgan referal so'rovlari yo'q!", show_alert=True)
+        return
+    for o in ol:
+        info = PRIVATE_GAME_LABELS.get(o.get("game", ""), ("O'yin", 0))
+        nicks = o.get("submitted_nicks") or []
+        b = InlineKeyboardBuilder()
+        b.button(text="✅ Tasdiqlash", callback_data=f"ps_ok_{o['_id']}")
+        b.button(text="❌ Rad etish",  callback_data=f"ps_no_{o['_id']}")
+        b.adjust(2)
+        await cb.message.answer(
+            f"🎮 *Referal so'rovi #{short_id(o['_id'])}*\n👤 @{esc_md(o.get('username','-'))}\n"
+            f"🎮 O'yin: *{info[0]}*\n🔑 Nik: `{esc_md(o.get('roblox_nick',''))}`\n"
+            f"👥 Kishilar: *{o.get('player_count','-')}*\n"
+            + ("📝 Niklar:\n" + "\n".join(f"• `{esc_md(n)}`" for n in nicks) if nicks else ""),
             reply_markup=b.as_markup()
         )
     await cb.answer()
@@ -3662,6 +3922,99 @@ async def adm_back(cb: types.CallbackQuery):
     await cb.answer()
 
 # ═══════════════════════════════════════════════════════
+# 👑 ADMIN QO'SHISH (faqat Super admin)
+# ═══════════════════════════════════════════════════════
+@dp.callback_query(F.data == "adm_addadmin")
+async def adm_addadmin(cb: types.CallbackQuery):
+    if not is_super_admin(cb.from_user.id):
+        return
+    b = InlineKeyboardBuilder()
+    b.button(text="👑 Super admin",        callback_data="addrole_super")
+    b.button(text="🎁 Referal admin",      callback_data="addrole_referral")
+    b.button(text="🪙 Robux admin",        callback_data="addrole_robux")
+    b.button(text="🚨 Mashkalar admin",    callback_data="addrole_mashka")
+    b.button(text="📋 Adminlar ro'yxati",  callback_data="adm_listadmins")
+    b.button(text="🔙 Admin panel",        callback_data="adm_back")
+    b.adjust(1)
+    await cb.message.answer(
+        "👑 *Admin qo'shish*\n\n"
+        "Quyidagi bo'limlardan birini tanlang:\n\n"
+        "👑 *Super admin* — hamma narsaga to'liq ruxsat\n"
+        "🎁 *Referal admin* — faqat referal/privat server so'rovlarini tasdiqlaydi\n"
+        "🪙 *Robux admin* — faqat Robux buyurtmalarini tasdiqlaydi\n"
+        "🚨 *Mashkalar admin* — faqat Mashkalar bo'limini boshqaradi\n\n"
+        "Rolni tanlang, so'ng foydalanuvchi ID raqamini yuborasiz:",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("addrole_"))
+async def adm_addrole_pick(cb: types.CallbackQuery, state: FSMContext):
+    if not is_super_admin(cb.from_user.id):
+        return
+    role = cb.data[len("addrole_"):]
+    if role not in ADMIN_ROLE_LABELS:
+        await cb.answer()
+        return
+    await state.update_data(new_admin_role=role)
+    await cb.message.answer(
+        f"🆔 {ADMIN_ROLE_LABELS[role]} sifatida qo'shmoqchi bo'lgan foydalanuvchining "
+        f"Telegram ID raqamini yuboring:",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(AdminRoleAdd.user_id)
+    await cb.answer()
+
+@dp.message(AdminRoleAdd.user_id)
+async def adm_addrole_uid(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel") or msg.text in ("❌ Bekor qilish", "❌ Cancel", "❌ Отмена"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = msg.text.strip()
+    if not txt.isdigit():
+        await msg.answer("❌ Faqat ID raqam yuboring (masalan: 123456789):")
+        return
+    target_id = int(txt)
+    d = await state.get_data()
+    role = d.get("new_admin_role")
+    if role not in ADMIN_ROLE_LABELS:
+        await state.clear()
+        await msg.answer("❌ Xatolik! Qaytadan boshlang.", reply_markup=main_kb(lang))
+        return
+    await add_admin_role(target_id, role)
+    await state.clear()
+    await msg.answer(
+        f"✅ Foydalanuvchi `{target_id}` endi *{ADMIN_ROLE_LABELS[role]}* etib tayinlandi!",
+        reply_markup=main_kb(lang)
+    )
+    try:
+        await bot.send_message(
+            target_id,
+            f"🎉 Tabriklaymiz! Siz botda *{ADMIN_ROLE_LABELS[role]}* etib tayinlandingiz.\n"
+            f"Boshqaruv paneliga kirish uchun /admin buyrug'ini yuboring."
+        )
+    except Exception:
+        pass
+
+@dp.callback_query(F.data == "adm_listadmins")
+async def adm_listadmins(cb: types.CallbackQuery):
+    if not is_super_admin(cb.from_user.id):
+        return
+    lines = ["👑 *Adminlar ro'yxati*\n"]
+    for aid in sorted(ADMIN_IDS):
+        lines.append(f"👑 `{aid}` — Super admin (asosiy)")
+    for aid, role in ADMIN_ROLES.items():
+        lines.append(f"{ADMIN_ROLE_LABELS.get(role,'❓')} `{aid}` — {ADMIN_ROLE_LABELS.get(role, role)}")
+    b = InlineKeyboardBuilder()
+    b.button(text="🔙 Admin panel", callback_data="adm_back")
+    b.adjust(1)
+    await cb.message.answer("\n".join(lines), reply_markup=b.as_markup())
+    await cb.answer()
+
+# ═══════════════════════════════════════════════════════
 # 🎁 REFERAL BO'LIMI
 # ═══════════════════════════════════════════════════════
 @dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_referral") for l in LANGS)))
@@ -3684,7 +4037,7 @@ async def cmd_referral(msg: types.Message, state: FSMContext):
         f"📋 Havolangiz:\n`{ref_link}`"
     )
     b = InlineKeyboardBuilder()
-    b.button(text="📋 Havolani nusxalash", switch_inline_query=ref_link)
+    b.button(text="📋 Havolani nusxalash", copy_text=types.CopyTextButton(text=ref_link))
     b.button(text="🎮 Referallarni ishlatish", callback_data="ref_use")
     b.button(text="🏆 Top 20 Reyting", callback_data="ref_top")
     b.adjust(1)
@@ -3748,7 +4101,7 @@ async def cb_my_refs(cb: types.CallbackQuery):
         f"━━━━━━━━━━━━━━━━━━━━"
     )
     b = InlineKeyboardBuilder()
-    b.button(text="📋 Havolani nusxalash", switch_inline_query=ref_link)
+    b.button(text="📋 Havolani nusxalash", copy_text=types.CopyTextButton(text=ref_link))
     b.button(text="🎮 Privat Server olish", callback_data="private_server_start")
     b.button(text="🏆 Top 20 Reyting", callback_data="ref_top")
     b.adjust(1)
@@ -3914,7 +4267,7 @@ async def ps_confirm(cb: types.CallbackQuery, state: FSMContext):
     ab.button(text="✅ Tasdiqlash", callback_data=f"ps_ok_{oid}")
     ab.button(text="❌ Rad etish",  callback_data=f"ps_no_{oid}")
     ab.adjust(2)
-    await notify_admins(admin_text, markup=ab.as_markup())
+    await notify_role_admins("referral", admin_text, markup=ab.as_markup())
     await state.clear()
 
     await cb.message.answer(
@@ -3943,7 +4296,7 @@ async def ps_cancel(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("ps_ok_"))
 async def ps_admin_ok(cb: types.CallbackQuery):
-    if not is_admin(cb.from_user.id):
+    if not is_referral_admin(cb.from_user.id):
         return
     oid = cb.data[len("ps_ok_"):]
     o   = await get_private_order(oid)
@@ -3973,7 +4326,7 @@ async def ps_admin_ok(cb: types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("ps_no_"))
 async def ps_admin_no(cb: types.CallbackQuery):
-    if not is_admin(cb.from_user.id):
+    if not is_referral_admin(cb.from_user.id):
         return
     oid = cb.data[len("ps_no_"):]
     o   = await reject_private_order(oid)
@@ -4028,6 +4381,7 @@ WEB_PORT     = int(os.getenv("PORT", 10000))
 
 async def on_startup(bot: Bot):
     await init_indexes()
+    await load_admin_roles()
     await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
     logging.info(f"✅ Webhook o'rnatildi: {WEBHOOK_URL}")
 
