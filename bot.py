@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 BOT_TOKEN         = os.getenv("BOT_TOKEN")
 MONGO_URI         = os.getenv("MONGO_URI")
 
-REQUIRED_CHANNELS = ["bulldrop_n1", "@uzbekroblox", "@trade_chanel_uz"]
+REQUIRED_CHANNELS = ["@roblox_chat_veko", "@uzbekroblox", "@trade_chanel_uz"]
 TRADE_CHANNEL     = "@trade_chanel_uz"
 CARD_NUMBER       = os.getenv("CARD_NUMBER", "5614682091344749")
 CARD_OWNER        = os.getenv("CARD_OWNER", "Nurboyev.N")
