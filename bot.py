@@ -135,7 +135,7 @@ LANGS = {
         "sub_msg": "👋 Salom! Botdan foydalanish uchun avval quyidagi kanallarga obuna bo'ling!",
         "sub_confirm": "✅ Obunani tasdiqlash",
         "not_subbed": "❌ Hali barcha kanallarga obuna bo'lmagansiz!",
-        "muted_msg": "🔇 Siz mute oldingiz! {rem} vaqt qoldi.",
+        "muted_msg": "🔇 *Kechirasiz, siz adminlar tomonidan mute qilindingiz!*\n\nShuning uchun botni hozircha ishlata olmaysiz.\n\n⏳ *Mute yechilish vaqti:* {rem}",
         "no_trades": "🔄 Hozircha faol tradelar yo'q.\n\n➕ *Trade qo'shish* tugmasini bosing!",
         "no_sales": "📊 Hozircha sotuvdagi buyumlar yo'q.\n\n➕ *Sotish qo'shish* tugmasini bosing!",
         "choose_game": "🎮 Qaysi o'yindagi itemingiz?\n\nO'yinni tanlang:",
@@ -214,7 +214,7 @@ LANGS = {
         "sub_msg": "👋 Hello! Please subscribe to all channels to use the bot!",
         "sub_confirm": "✅ Confirm Subscription",
         "not_subbed": "❌ You haven't subscribed to all channels yet!",
-        "muted_msg": "🔇 You are muted! {rem} remaining.",
+        "muted_msg": "🔇 *Sorry, you have been muted by admins!*\n\nYou cannot use the bot right now.\n\n⏳ *Mute ends in:* {rem}",
         "no_trades": "🔄 No active trades yet.\n\n➕ Press *Add Trade*!",
         "no_sales": "📊 No active sales yet.\n\n➕ Press *Add Sale*!",
         "choose_game": "🎮 Which game is your item from?\n\nSelect a game:",
@@ -293,7 +293,7 @@ LANGS = {
         "sub_msg": "👋 Привет! Подпишитесь на все каналы, чтобы использовать бот!",
         "sub_confirm": "✅ Подтвердить подписку",
         "not_subbed": "❌ Вы ещё не подписались на все каналы!",
-        "muted_msg": "🔇 Вы получили мут! Осталось {rem}.",
+        "muted_msg": "🔇 *Извините, вы замучены администраторами!*\n\nВы не можете пользоваться ботом сейчас.\n\n⏳ *Мут закончится через:* {rem}",
         "no_trades": "🔄 Пока нет активных трейдов.\n\n➕ Нажмите *Добавить трейд*!",
         "no_sales": "📊 Пока нет активных продаж.\n\n➕ Нажмите *Добавить продажу*!",
         "choose_game": "🎮 В какой игре ваш предмет?\n\nВыберите игру:",
@@ -373,6 +373,7 @@ sale_cart      = mdb["sale_cart"]
 scammers       = mdb["scammers"]
 admins_col     = mdb["admins"]
 duels          = mdb["duels"]
+settings_col   = mdb["settings"]
 
 async def init_indexes():
     await users.create_index("user_id", unique=True)
@@ -420,6 +421,46 @@ async def upsert_user(uid, uname, lang="uz"):
         "$setOnInsert": {"user_id": uid, "balance": 0, "total_deposited": 0, "joined": now(), "lang": lang}
     }
     await users.update_one({"user_id": uid}, upd, upsert=True)
+
+async def finalize_referral(uid: int, state: FSMContext):
+    """FSM holatida saqlangan pending_ref bo'lsa, foydalanuvchi hali ro'yxatdan
+    o'tmagan (yangi) bo'lsa va referal hali biriktirilmagan bo'lsa - referalni yakunlaydi.
+    Bu funksiya /start, tilni tanlash va 'obunani tasdiqlash' bosqichlarining hammasida
+    chaqiriladi, shunda obunaga o'tib keyin qaytgan foydalanuvchilar uchun ham referal ishlaydi."""
+    try:
+        data = await state.get_data()
+    except Exception:
+        data = {}
+    ref_uid = data.get("pending_ref")
+    if not ref_uid or ref_uid == uid:
+        return
+    existing_user = await get_user(uid)
+    if existing_user:
+        return
+    already = await get_referrer(uid)
+    if already:
+        return
+    inviter = await get_user(ref_uid)
+    if not inviter:
+        return
+    await set_referrer(uid, ref_uid)
+    await add_ref(ref_uid)
+    inviter_lang = inviter.get("lang", "uz")
+    try:
+        ref_total = await get_ref_count(ref_uid)
+        await bot.send_message(
+            ref_uid,
+            f"🎉 *Yangi referal qo'shildi!*\n\n"
+            f"👤 Siz taklif qilgan odam botga kirdi.\n"
+            f"🎁 Jami refallaringiz: *{ref_total}* ta",
+            reply_markup=main_kb(inviter_lang)
+        )
+    except Exception:
+        pass
+    try:
+        await state.update_data(pending_ref=None)
+    except Exception:
+        pass
 
 async def get_balance(uid):
     u = await users.find_one({"user_id": uid}, {"balance": 1})
@@ -792,6 +833,81 @@ def plus_price_for(key):
 DEPOSIT_OPTIONS = [5000, 10000, 15000, 20000, 30000, 50000, 100000]
 
 # ═══════════════════════════════════════════════════════
+# VALYUTA TIZIMI — barcha narxlar bazada SO'M (UZS) da saqlanadi.
+# Til o'zgarganda foydalanuvchiga real kurs bo'yicha qayta hisoblab ko'rsatiladi:
+#   uz -> so'm (UZS), ru -> rubl (RUB), en -> dollar (USD)
+# Kurslarni admin panel orqali yangilash mumkin (adm_rates), yoki shu yerdan qo'lda.
+# ═══════════════════════════════════════════════════════
+CURRENCY_RATES = {
+    # 1 birlik shu valyuta = necha so'm
+    "UZS": 1.0,
+    "USD": 12700.0,   # 1 USD ≈ 12700 so'm (taxminiy, admin panelda yangilanadi)
+    "RUB": 155.0,      # 1 RUB ≈ 155 so'm (taxminiy, admin panelda yangilanadi)
+}
+
+LANG_CURRENCY = {
+    "uz": "UZS",
+    "ru": "RUB",
+    "en": "USD",
+}
+
+CURRENCY_SYMBOL = {
+    "UZS": "so'm",
+    "RUB": "₽",
+    "USD": "$",
+}
+
+async def get_currency_rates() -> dict:
+    """MongoDB'dagi 'settings' kolleksiyasidan kurslarni o'qiydi, bo'lmasa default qiymatlarni qaytaradi."""
+    try:
+        doc = await settings_col.find_one({"_id": "currency_rates"})
+        if doc:
+            rates = dict(CURRENCY_RATES)
+            rates.update({k: v for k, v in doc.items() if k in ("USD", "RUB")})
+            return rates
+    except Exception:
+        pass
+    return CURRENCY_RATES
+
+async def set_currency_rate(code: str, rate: float):
+    await settings_col.update_one(
+        {"_id": "currency_rates"},
+        {"$set": {code: rate}},
+        upsert=True
+    )
+    CURRENCY_RATES[code] = rate
+
+def _convert_uzs(amount_uzs: float, target_code: str, rates: dict) -> float:
+    rate = rates.get(target_code, 1.0)
+    if rate <= 0:
+        rate = 1.0
+    return amount_uzs / rate
+
+async def format_money(amount_uzs: float, lang: str) -> str:
+    """Bazaviy so'm miqdorini foydalanuvchi tili valyutasiga o'girib, formatlangan matn qaytaradi."""
+    code = LANG_CURRENCY.get(lang, "UZS")
+    if code == "UZS":
+        return f"{int(round(amount_uzs)):,} so'm"
+    rates = await get_currency_rates()
+    val = _convert_uzs(amount_uzs, code, rates)
+    symbol = CURRENCY_SYMBOL.get(code, code)
+    if code == "USD":
+        return f"${val:,.2f}"
+    return f"{val:,.2f} {symbol}"
+
+def format_money_sync(amount_uzs: float, lang: str, rates: dict | None = None) -> str:
+    """format_money ning sync (DB so'ramaydigan) versiyasi — rates oldindan olingan bo'lsa ishlatiladi."""
+    code = LANG_CURRENCY.get(lang, "UZS")
+    if code == "UZS":
+        return f"{int(round(amount_uzs)):,} so'm"
+    rates = rates or CURRENCY_RATES
+    val = _convert_uzs(amount_uzs, code, rates)
+    symbol = CURRENCY_SYMBOL.get(code, code)
+    if code == "USD":
+        return f"${val:,.2f}"
+    return f"{val:,.2f} {symbol}"
+
+# ═══════════════════════════════════════════════════════
 # STATES
 # ═══════════════════════════════════════════════════════
 class LangSelect(StatesGroup):
@@ -875,6 +991,10 @@ class OnlineTraderAdd(StatesGroup):
 class OnlineTraderEdit(StatesGroup):
     nick  = State()
     bio   = State()
+
+class RateEdit(StatesGroup):
+    usd = State()
+    rub = State()
 
 class MuteFlow(StatesGroup):
     user_id  = State()
@@ -1030,8 +1150,16 @@ async def not_subscribed_channels(uid: int) -> list:
             if m.status in ["left", "kicked", "banned"]:
                 missing.append(ch)
         except Exception as e:
-            logging.error(f"Sub check xato ({ch}): {e}")
-            missing.append(ch)
+            err = str(e).lower()
+            # Agar xato foydalanuvchi haqiqatan a'zo emasligidan bo'lsa - obuna yo'q deb hisoblaymiz
+            if "user not found" in err or "user_not_participant" in err or "chat not found" in err:
+                logging.warning(f"Sub check ({ch}): foydalanuvchi topilmadi/a'zo emas -> {e}")
+                missing.append(ch)
+            else:
+                # Bot kanalda admin emas yoki boshqa texnik xato - foydalanuvchini
+                # noto'g'ri bloklamaslik uchun bu kanalni tekshiruvdan o'tkazib yuboramiz,
+                # lekin adminlarga log orqali xabar beramiz
+                logging.error(f"⚠️ Sub check texnik xato ({ch}), foydalanuvchi bloklanmadi: {e}")
     return missing
 
 async def is_sub(uid: int) -> bool:
@@ -1198,6 +1326,11 @@ async def cmd_start(msg: types.Message, state: FSMContext):
         except ValueError:
             ref_uid = None
 
+    if ref_uid:
+        # Obunaga o'tib qaytishi mumkin bo'lgani uchun referalni FSM holatida saqlab qo'yamiz -
+        # keyinroq obuna/til tasdiqlangach finalize_referral orqali yakunlanadi.
+        await state.update_data(pending_ref=ref_uid)
+
     missing = await not_subscribed_channels(uid)
     u = await get_user(uid)
     lang = (u or {}).get("lang", None)
@@ -1220,24 +1353,9 @@ async def cmd_start(msg: types.Message, state: FSMContext):
         await state.set_state(LangSelect.choosing)
         return
 
-    # Yangi foydalanuvchi bo'lsa va referal bo'lsa
-    if not u and ref_uid:
-        already = await get_referrer(uid)
-        if not already:
-            inviter = await get_user(ref_uid)
-            if inviter:
-                await set_referrer(uid, ref_uid)
-                await add_ref(ref_uid)
-                inviter_lang = inviter.get("lang", "uz")
-                try:
-                    ref_total = await get_ref_count(ref_uid)
-                    await bot.send_message(ref_uid,
-                        f"🎉 *Yangi referal qo'shildi!*\n\n"
-                        f"👤 Siz taklif qilgan odam botga kirdi.\n"
-                        f"🎁 Jami refallaringiz: *{ref_total}* ta",
-                        reply_markup=main_kb(inviter_lang))
-                except Exception:
-                    pass
+    # Yangi foydalanuvchi bo'lsa va referal bo'lsa - endi finalize_referral orqali,
+    # bu obunaga o'tib qaytgan foydalanuvchilar uchun ham ishlaydi
+    await finalize_referral(uid, state)
 
     await upsert_user(uid, msg.from_user.username or "user", lang)
     await msg.answer(
@@ -1250,6 +1368,7 @@ async def cb_setlang(cb: types.CallbackQuery, state: FSMContext):
     lang = cb.data.split("_")[1]
     uid = cb.from_user.id
     await set_user_lang(uid, lang)
+    await finalize_referral(uid, state)
     await upsert_user(uid, cb.from_user.username or "user", lang)
     await state.clear()
     try:
@@ -1301,6 +1420,7 @@ async def cb_check_sub(cb: types.CallbackQuery, state: FSMContext):
         )
         await cb.answer()
         return
+    await finalize_referral(uid, state)
     await upsert_user(uid, cb.from_user.username or "user", u["lang"])
     await cb.message.answer(T(lang, "start_welcome", name=cb.from_user.first_name), reply_markup=main_kb(lang))
     await cb.answer()
@@ -1325,11 +1445,13 @@ async def cmd_profile(msg: types.Message, state: FSMContext):
         b.button(text=f"🛍 **Mening sotuvlarim** ({len(sl)})", callback_data="my_sales_0")
     b.button(text=f"🎁 **Referallarim** ({ref_count})", callback_data="my_refs")
     b.adjust(1)
+    bal_str = await format_money(u.get('balance', 0), lang)
+    dep_str = await format_money(u.get('total_deposited', 0), lang)
     await msg.answer(
         f"👤 **Profilingiz**\n\n"
         f"🆔 ID: `{uid}`\n"
-        f"💰 Balans: **{u.get('balance', 0):,} so'm**\n"
-        f"📈 Jami kiritilgan: **{u.get('total_deposited', 0):,} so'm**\n"
+        f"💰 Balans: **{bal_str}**\n"
+        f"📈 Jami kiritilgan: **{dep_str}**\n"
         f"📅 Ro'yxat: {u.get('joined', '-')}\n\n"
         f"🔄 Faol tradelarim: {len(tr)}\n"
         f"🛍 Faol sotuvlarim: {len(sl)}\n"
@@ -1388,12 +1510,18 @@ async def cb_my_sales(cb: types.CallbackQuery):
 async def cmd_deposit(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
+    uid = msg.from_user.id
+    lang = await get_user_lang(uid)
+    rates = await get_currency_rates()
     b = InlineKeyboardBuilder()
     for amt in DEPOSIT_OPTIONS:
-        b.button(text=f"{amt:,} so'm", callback_data=f"damt_{amt}")
+        label = f"{amt:,} so'm"
+        if lang != "uz":
+            label += f" ({format_money_sync(amt, lang, rates)})"
+        b.button(text=label, callback_data=f"damt_{amt}")
     b.button(text="✏️ Boshqa miqdor", callback_data="damt_custom")
     b.adjust(2)
-    await msg.answer("💰 *Hisob to'ldirish*\n\nQancha to'ldirmoqchisiz?", reply_markup=b.as_markup())
+    await msg.answer("💰 *Hisob to'ldirish*\n\n📌 To'lov karta orqali FAQAT so'mda qabul qilinadi (qavs ichida taxminiy ekvivalent ko'rsatilgan).\n\nQancha to'ldirmoqchisiz?", reply_markup=b.as_markup())
 
 @dp.callback_query(F.data.startswith("damt_"))
 async def cb_damt(cb: types.CallbackQuery, state: FSMContext):
@@ -1410,7 +1538,7 @@ async def cb_damt(cb: types.CallbackQuery, state: FSMContext):
         return
     amount = int(cb.data.split("_")[1])
     await state.update_data(dep_amount=amount)
-    await _show_card(cb.message, amount)
+    await _show_card(cb.message, amount, lang)
     await cb.answer()
 
 @dp.message(Dep.custom_amount)
@@ -1427,18 +1555,22 @@ async def dep_custom(msg: types.Message, state: FSMContext):
         return
     amount = int(txt)
     await state.update_data(dep_amount=amount)
-    await _show_card(msg, amount)
+    await _show_card(msg, amount, lang)
 
-async def _show_card(target, amount: int):
+async def _show_card(target, amount: int, lang: str = "uz"):
     b = InlineKeyboardBuilder()
     b.button(text="✅ To'lov qildim", callback_data="dep_paid")
     b.button(text="❌ Bekor qilish",  callback_data="dep_cancel")
     b.adjust(1)
     card_display = CARD_NUMBER.replace("-", "").replace(" ", "")
     card_display = " ".join([card_display[i:i+4] for i in range(0, len(card_display), 4)])
+    amount_line = f"💰 Miqdor: *{amount:,} so'm*"
+    if lang != "uz":
+        eq = await format_money(amount, lang)
+        amount_line += f" (≈ {eq})"
     text = (
         f"💳 *To'lov ma'lumotlari*\n\n"
-        f"💰 Miqdor: *{amount:,} so'm*\n\n"
+        f"{amount_line}\n\n"
         f"🏦 Karta raqami:\n`{card_display}`\n\n"
         f"👤 Karta egasi: *{CARD_OWNER}*\n\n"
         f"📌 Karta raqamiga bosib nusxa oling, to'lovni amalga oshiring va ✅ To'lov qildim tugmasini bosing."
@@ -1515,8 +1647,9 @@ async def cb_dok(cb: types.CallbackQuery):
         return
     await approve_deposit(did)
     user_lang = await get_user_lang(dep["user_id"])
+    amt_str = await format_money(dep['amount'], user_lang)
     try:
-        await bot.send_message(dep["user_id"], f"✅ To'lovingiz tasdiqlandi!\n💰 *{dep['amount']:,} so'm* hisobingizga qo'shildi!", reply_markup=main_kb(user_lang))
+        await bot.send_message(dep["user_id"], f"✅ To'lovingiz tasdiqlandi!\n💰 *{amt_str}* hisobingizga qo'shildi!", reply_markup=main_kb(user_lang))
     except Exception:
         pass
     try:
@@ -1557,19 +1690,21 @@ async def cmd_buy(msg: types.Message, state: FSMContext):
     uid = msg.from_user.id
     lang = await get_user_lang(uid)
     bal = await get_balance(uid)
+    rates = await get_currency_rates()
     b = InlineKeyboardBuilder()
     for r, p in ROBUX_PRICES:
-        b.button(text=f"**{r}** Rbx — {p:,} so'm", callback_data=f"buy_{r}")
+        b.button(text=f"**{r}** Rbx — {format_money_sync(p, lang, rates)}", callback_data=f"buy_{r}")
     b.adjust(3)
     # Roblox Plus tugmalari
     b.button(text="━━━━ 🌟 Roblox Plus ━━━━", callback_data="plus_noop")
     for key, label, price in ROBLOX_PLUS_OPTIONS:
-        b.button(text=f"✨ {label} — {price:,} so'm", callback_data=f"buyplus_{key}")
-    b.button(text="🆓 Free Trial — 15.000 so'm", callback_data="buy_freetrial")
+        b.button(text=f"✨ {label} — {format_money_sync(price, lang, rates)}", callback_data=f"buyplus_{key}")
+    b.button(text=f"🆓 Free Trial — {format_money_sync(FREE_TRIAL_PRICE, lang, rates)}", callback_data="buy_freetrial")
     b.adjust(3, 3, 3, 3, 1, 1, 1, 1, 1, 1)
+    bal_str = format_money_sync(bal, lang, rates)
     await msg.answer(
         f"🌟 **Assalomu alaykum!**\n"
-        f"💰 Balansingiz: **{bal:,} so'm**\n\n"
+        f"💰 Balansingiz: **{bal_str}**\n\n"
         f"📊 **ROBUX NARXLARI (PAKETLAR):**\n\n"
         f"👇 Quyidagilardan birini tanlang:",
         reply_markup=b.as_markup()
@@ -1628,7 +1763,9 @@ async def cb_buy(cb: types.CallbackQuery, state: FSMContext):
         return
     bal = await get_balance(uid)
     if bal < price:
-        await cb.answer(f"❌ Hisobingiz yetarli emas!\nKerak: {price:,} so'm\nBalans: {bal:,} so'm", show_alert=True)
+        need_str = await format_money(price, lang)
+        bal_str = await format_money(bal, lang)
+        await cb.answer(f"❌ Hisobingiz yetarli emas!\nKerak: {need_str}\nBalans: {bal_str}", show_alert=True)
         return
     await state.update_data(buy_robux=robux, buy_price=price)
     await cb.message.answer("🎮 Roblox nikingizni kiriting:", reply_markup=cancel_kb(lang))
@@ -1666,11 +1803,12 @@ async def buy_mood(msg: types.Message, state: FSMContext):
     b.button(text="✅ Tasdiqlash", callback_data="buy_confirm")
     b.button(text="✏️ Tahrirlash", callback_data="buy_redo")
     b.adjust(2)
+    price_str = await format_money(d['buy_price'], lang)
     await msg.answer(
         f"📋 *Ma'lumotlarni tekshiring*\n\n"
         f"🎮 Nik: `{esc_md(d['buy_nick'])}`\n"
         f"🪙 Robux: *{d['buy_robux']}*\n"
-        f"💵 Narx: *{d['buy_price']:,} so'm*\n"
+        f"💵 Narx: *{price_str}*\n"
         f"😊 Parolingiz: {esc_md(mood)}\n\n"
         f"Hammasi to'g'ri bo'lsa tasdiqlang:",
         reply_markup=b.as_markup()
@@ -1699,7 +1837,9 @@ async def cb_buy_confirm(cb: types.CallbackQuery, state: FSMContext):
         return
     bal = await get_balance(uid)
     if bal < price:
-        await cb.answer(f"❌ Hisobingiz yetarli emas!\nKerak: {price:,} so'm\nBalans: {bal:,} so'm", show_alert=True)
+        need_str = await format_money(price, lang)
+        bal_str = await format_money(bal, lang)
+        await cb.answer(f"❌ Hisobingiz yetarli emas!\nKerak: {need_str}\nBalans: {bal_str}", show_alert=True)
         await state.clear()
         return
     await sub_balance(uid, price)
@@ -1708,6 +1848,7 @@ async def cb_buy_confirm(cb: types.CallbackQuery, state: FSMContext):
     b.button(text="✅ Tasdiqlash", callback_data=f"ook_{oid}")
     b.button(text="❌ Rad etish", callback_data=f"ono_{oid}")
     b.adjust(2)
+    # Admin xabarlari doim so'mda (do'kon egasining ish valyutasi)
     await notify_role_admins(
         "robux",
         f"🛒 *Robux buyurtma #{short_id(oid)}*\n\n"
@@ -1719,10 +1860,11 @@ async def cb_buy_confirm(cb: types.CallbackQuery, state: FSMContext):
         markup=b.as_markup()
     )
     await state.clear()
+    price_str = await format_money(price, lang)
     await cb.message.answer(
         f"✅ *Buyurtmangiz qabul qilindi!*\n\n"
         f"🪙 Robux: *{robux}*\n"
-        f"💵 To'langan: *{price:,} so'm*\n"
+        f"💵 To'langan: *{price_str}*\n"
         f"🎮 Nik: `{esc_md(nick)}`\n"
         f"📋 Buyurtma #{short_id(oid)}\n\n"
         f"😴 Admin tasdiqlagunicha 2 step ochirib qoyib kutib turing.",
@@ -1762,8 +1904,9 @@ async def cb_ono(cb: types.CallbackQuery):
         return
     await reject_order(oid)
     user_lang = await get_user_lang(o["user_id"])
+    refund_str = await format_money(o['price_sum'], user_lang)
     try:
-        await bot.send_message(o["user_id"], f"❌ Rad etildi.\n📋 Buyurtma #{short_id(ObjectId(str(oid)))}\n💰 {o['price_sum']:,} so'm hisobingizga qaytarildi.", reply_markup=main_kb(user_lang))
+        await bot.send_message(o["user_id"], f"❌ Rad etildi.\n📋 Buyurtma #{short_id(ObjectId(str(oid)))}\n💰 {refund_str} hisobingizga qaytarildi.", reply_markup=main_kb(user_lang))
     except Exception:
         pass
     try:
@@ -3391,6 +3534,39 @@ async def mute_remaining(uid: int) -> str:
     return f"{s} soniya"
 
 # ═══════════════════════════════════════════════════════
+# GLOBAL MUTE MIDDLEWARE — /start va barcha tugma/komandalarni qamrab oladi
+# ═══════════════════════════════════════════════════════
+from aiogram import BaseMiddleware
+
+class MuteMiddleware(BaseMiddleware):
+    async def __call__(self, handler, event, data):
+        user = data.get("event_from_user")
+        if user and not is_admin(user.id):
+            try:
+                muted = await is_muted(user.id)
+            except Exception:
+                muted = False
+            if muted:
+                lang = await get_user_lang(user.id)
+                rem = await mute_remaining(user.id)
+                text = T(lang, "muted_msg", rem=rem)
+                if isinstance(event, types.CallbackQuery):
+                    try:
+                        await event.answer(text.replace("*", ""), show_alert=True)
+                    except Exception:
+                        pass
+                elif isinstance(event, types.Message):
+                    try:
+                        await event.answer(text)
+                    except Exception:
+                        pass
+                return  # handlerga o'tkazmaymiz — bot ishlamaydi
+        return await handler(event, data)
+
+dp.message.outer_middleware(MuteMiddleware())
+dp.callback_query.outer_middleware(MuteMiddleware())
+
+# ═══════════════════════════════════════════════════════
 # ADMIN PANEL
 # ═══════════════════════════════════════════════════════
 async def admin_panel_kb():
@@ -3411,7 +3587,8 @@ async def admin_panel_kb():
     b.button(text=f"🚨 Mashka qo'shish",           callback_data="adm_addscam")
     b.button(text=f"🚨 Mashkalar ({scam_cnt})",    callback_data="adm_scamlist_0")
     b.button(text="👑 Admin qo'shish",             callback_data="adm_addadmin")
-    b.adjust(2, 2, 2, 2, 2, 1)
+    b.button(text="💱 Valyuta kurslari",           callback_data="adm_rates")
+    b.adjust(2, 2, 2, 2, 2, 1, 1)
     return b.as_markup(), cnt, or_, tr, sl
 
 @dp.message(Command("admin"))
@@ -3550,6 +3727,69 @@ async def adm_sl(cb: types.CallbackQuery):
         else:
             await cb.message.answer(caption, reply_markup=b.as_markup())
     await cb.answer()
+
+@dp.callback_query(F.data == "adm_rates")
+async def adm_rates(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    rates = await get_currency_rates()
+    await cb.message.answer(
+        f"💱 *Valyuta kurslari* (bazaviy: so'm)\n\n"
+        f"🇺🇸 1 USD = *{rates.get('USD', 0):,.0f}* so'm\n"
+        f"🇷🇺 1 RUB = *{rates.get('RUB', 0):,.0f}* so'm\n\n"
+        f"Bu kurslar tilni o'zgartirganda barcha narxlarni (Robux, hisob to'ldirish va h.k.) "
+        f"tegishli valyutaga avtomatik qayta hisoblash uchun ishlatiladi.\n\n"
+        f"Yangi USD kursini kiriting (1 USD necha so'm):",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(RateEdit.usd)
+    await cb.answer()
+
+@dp.message(RateEdit.usd)
+async def rate_set_usd(msg: types.Message, state: FSMContext):
+    uid = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = msg.text.strip().replace(" ", "").replace(",", "")
+    try:
+        val = float(txt)
+        if val <= 0:
+            raise ValueError
+    except ValueError:
+        await msg.answer("❌ Musbat raqam kiriting (masalan: 12700):")
+        return
+    await state.update_data(new_usd=val)
+    await msg.answer("Endi yangi RUB kursini kiriting (1 RUB necha so'm):", reply_markup=cancel_kb())
+    await state.set_state(RateEdit.rub)
+
+@dp.message(RateEdit.rub)
+async def rate_set_rub(msg: types.Message, state: FSMContext):
+    uid = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = msg.text.strip().replace(" ", "").replace(",", "")
+    try:
+        val = float(txt)
+        if val <= 0:
+            raise ValueError
+    except ValueError:
+        await msg.answer("❌ Musbat raqam kiriting (masalan: 155):")
+        return
+    d = await state.get_data()
+    usd_val = d.get("new_usd")
+    await set_currency_rate("USD", usd_val)
+    await set_currency_rate("RUB", val)
+    await state.clear()
+    await msg.answer(
+        f"✅ Kurslar yangilandi!\n\n🇺🇸 1 USD = {usd_val:,.0f} so'm\n🇷🇺 1 RUB = {val:,.0f} so'm",
+        reply_markup=main_kb(lang)
+    )
 
 @dp.callback_query(F.data == "adm_addbal")
 async def adm_addbal(cb: types.CallbackQuery, state: FSMContext):
