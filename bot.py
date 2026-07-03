@@ -5065,42 +5065,51 @@ async def rbx_show_online(cb: types.CallbackQuery):
         await cb.message.answer(text, reply_markup=b.as_markup())
 
 # ═══════════════════════════════════════════════════════
-# WEBHOOK + MAIN
+# POLLING + MAIN
+# (Webhook o'rniga polling ishlatiladi — Render "Background Worker" yoki
+#  "Web Service" bo'lishidan qat'iy nazar ishonchli ishlaydi, chunki
+#  polling uchun tashqi/kiruvchi port ochish shart emas, faqat bot
+#  Telegram serveriga o'zi so'rov yuborib turadi.)
 # ═══════════════════════════════════════════════════════
-WEBHOOK_HOST = os.getenv("RENDER_EXTERNAL_URL", "")
-WEBHOOK_PATH = f"/webhook/{BOT_TOKEN}"
-WEBHOOK_URL  = f"{WEBHOOK_HOST}{WEBHOOK_PATH}"
-WEB_PORT     = int(os.getenv("PORT", 10000))
+WEB_PORT = int(os.getenv("PORT", 10000))
 
 
-async def on_startup(bot: Bot):
+async def on_startup_polling():
     await init_indexes()
     await load_admin_roles()
-    await bot.set_webhook(WEBHOOK_URL, drop_pending_updates=True)
-    logging.info(f"✅ Webhook o'rnatildi: {WEBHOOK_URL}")
+    # Agar avval webhook o'rnatilgan bo'lsa, uni tozalaymiz (polling bilan
+    # webhook bir vaqtda ishlay olmaydi)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+    except Exception as e:
+        logging.warning(f"Webhook o'chirishda xato (muhim emas): {e}")
+    logging.info("✅ Bot polling rejimida ishga tushdi")
 
 
-async def on_shutdown(bot: Bot):
-    await bot.delete_webhook()
-    logging.info("🔴 Webhook o'chirildi.")
-
-
-def main():
-    dp.startup.register(on_startup)
-    dp.shutdown.register(on_shutdown)
-
+async def _run_health_server():
+    """Render 'Web Service' turi uchun port ochib turadigan yengil server.
+    Agar 'Background Worker' bo'lsa ham, bu server zarar keltirmaydi."""
     app = web.Application()
 
     async def health(request):
-        return web.Response(text="OK")
+        return web.Response(text="OK - bot ishlayapti (polling)")
 
     app.router.add_get("/", health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, host="0.0.0.0", port=WEB_PORT)
+    await site.start()
+    logging.info(f"🌐 Health-check server {WEB_PORT} portda ishga tushdi")
 
-    SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
-    setup_application(app, dp, bot=bot)
 
-    logging.info(f"🚀 Server port {WEB_PORT} da ishga tushdi")
-    web.run_app(app, host="0.0.0.0", port=WEB_PORT)
+async def main_async():
+    await on_startup_polling()
+    await _run_health_server()
+    await dp.start_polling(bot)
+
+
+def main():
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":
