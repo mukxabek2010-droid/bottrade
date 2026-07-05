@@ -33,7 +33,7 @@ CARD_OWNER        = os.getenv("CARD_OWNER", "Nurboyev.N")
 CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_chat_veko")
 ROBLOX_SCRIPT_CHANNEL = os.getenv("ROBLOX_SCRIPT_CHANNEL", "https://t.me/deltauzbrb")
 
-ADMIN_IDS = {8866852203}
+ADMIN_IDS = {8866852203, 7405798326}
 
 def is_admin(uid: int) -> bool:
     return uid in ADMIN_IDS or ADMIN_ROLES.get(uid) == "super"
