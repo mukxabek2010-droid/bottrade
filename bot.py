@@ -50,6 +50,9 @@ ADMIN_ROLE_LABELS = {
     "referral": "🎁 Referal admin",
     "robux":    "🪙 Robux admin",
     "mashka":   "🚨 Mashkalar admin",
+    "stock":    "📦 Stock admin",
+    "bloxfruit":"🍈 Xizmatlar admin",
+    "abuse":    "🎯 Admin abuse admin",
 }
 
 # Xotirada keshlanadigan rollar: {user_id: role}
@@ -81,6 +84,15 @@ def is_robux_admin(uid: int) -> bool:
 
 def is_mashka_admin(uid: int) -> bool:
     return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "mashka"
+
+def is_stock_admin(uid: int) -> bool:
+    return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "stock"
+
+def is_bloxfruit_admin(uid: int) -> bool:
+    return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "bloxfruit"
+
+def is_abuse_admin(uid: int) -> bool:
+    return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "abuse"
 
 def is_any_admin(uid: int) -> bool:
     return is_super_admin(uid) or uid in ADMIN_ROLES
@@ -132,6 +144,8 @@ LANGS = {
         "btn_search": "🔍 Qidiruv",
         "btn_referral": "🎁 Referal",
         "btn_change_lang": "🌐 Tilni o'zgartirish",
+        "btn_bloxfruit": "🍈 Blox Fruit",
+        "btn_admin_abuse": "🎯 Admin abuselar",
         "sub_msg": "👋 Salom! Botdan foydalanish uchun avval quyidagi kanallarga obuna bo'ling!",
         "sub_confirm": "✅ Obunani tasdiqlash",
         "not_subbed": "❌ Hali barcha kanallarga obuna bo'lmagansiz!",
@@ -211,6 +225,8 @@ LANGS = {
         "btn_search": "🔍 Search",
         "btn_referral": "🎁 Referral",
         "btn_change_lang": "🌐 Change Language",
+        "btn_bloxfruit": "🍈 Blox Fruit",
+        "btn_admin_abuse": "🎯 Admin Abuses",
         "sub_msg": "👋 Hello! Please subscribe to all channels to use the bot!",
         "sub_confirm": "✅ Confirm Subscription",
         "not_subbed": "❌ You haven't subscribed to all channels yet!",
@@ -290,6 +306,8 @@ LANGS = {
         "btn_search": "🔍 Поиск",
         "btn_referral": "🎁 Реферал",
         "btn_change_lang": "🌐 Сменить язык",
+        "btn_bloxfruit": "🍈 Blox Fruit",
+        "btn_admin_abuse": "🎯 Админ абузы",
         "sub_msg": "👋 Привет! Подпишитесь на все каналы, чтобы использовать бот!",
         "sub_confirm": "✅ Подтвердить подписку",
         "not_subbed": "❌ Вы ещё не подписались на все каналы!",
@@ -908,6 +926,85 @@ def format_money_sync(amount_uzs: float, lang: str, rates: dict | None = None) -
     return f"{val:,.2f} {symbol}"
 
 # ═══════════════════════════════════════════════════════
+# BLOX FRUIT BO'LIMI (Stock + Xizmatlar) — sozlamalar
+# ═══════════════════════════════════════════════════════
+DEFAULT_BF_STOCK_CHANNEL = "https://t.me/deltauzbrb"
+
+BF_SERVICES = [
+    ("bf_lvl",     "🆙 Lvl ko'tarib berish"),
+    ("bf_money",   "💰 Pul ko'paytirib berish"),
+    ("bf_raid",    "🛡 Raidlardan o'tib berish"),
+    ("bf_fruit",   "🍈 Fruit sotiladi"),
+    ("bf_storage", "📦 1+ Storage"),
+]
+
+BF_SERVICES_TEXT = {
+    "bf_lvl":     "🆙 *Lvl ko'tarib berish*\n\nAkkingizga kirib o'tirmaymiz — faqat natijani topshiramiz. Xohlagan levelgacha ko'tarib beramiz.",
+    "bf_money":   "💰 *Pul ko'paytirib berish*\n\nO'yin ichi valyutangizni tez va xavfsiz ko'paytirib beramiz.",
+    "bf_raid":    "🛡 *Raidlardan o'tib berish*\n\nEng qiyin raid/bosslardan sizning o'rningizga o'tib beramiz.",
+    "bf_fruit":   "🍈 *Fruit sotiladi*\n\nXohlagan Blox Fruit turini sotib olishingiz mumkin.",
+    "bf_storage": "📦 *1+ Storage*\n\nQo'shimcha storage slotlarini oshirib beramiz.",
+}
+
+async def get_bf_stock_channel() -> str:
+    try:
+        doc = await settings_col.find_one({"_id": "bf_stock_channel"})
+        if doc and doc.get("url"):
+            return doc["url"]
+    except Exception:
+        pass
+    return DEFAULT_BF_STOCK_CHANNEL
+
+async def set_bf_stock_channel(url: str):
+    await settings_col.update_one({"_id": "bf_stock_channel"}, {"$set": {"url": url}}, upsert=True)
+
+DEFAULT_ADMIN_ABUSE_GAMES = [
+    "1. Blox Fruits", "2. Pet Simulator 99", "3. Adopt Me!", "4. Brookhaven RP",
+    "5. Grow a Garden", "6. Da Hood", "7. Arsenal", "8. Blade Ball",
+    "9. Murder Mystery 2", "10. Anime Vanguards",
+]
+DEFAULT_ADMIN_ABUSE_HOUR = "22:00 - 23:00 (GMT+5, Toshkent vaqti)"
+
+async def get_admin_abuse_data() -> dict:
+    try:
+        doc = await settings_col.find_one({"_id": "admin_abuse"})
+        if doc:
+            return {"games": doc.get("games", DEFAULT_ADMIN_ABUSE_GAMES), "hour": doc.get("hour", DEFAULT_ADMIN_ABUSE_HOUR)}
+    except Exception:
+        pass
+    return {"games": DEFAULT_ADMIN_ABUSE_GAMES, "hour": DEFAULT_ADMIN_ABUSE_HOUR}
+
+async def set_admin_abuse_games(games: list):
+    await settings_col.update_one({"_id": "admin_abuse"}, {"$set": {"games": games}}, upsert=True)
+
+async def set_admin_abuse_hour(hour: str):
+    await settings_col.update_one({"_id": "admin_abuse"}, {"$set": {"hour": hour}}, upsert=True)
+
+# ═══════════════════════════════════════════════════════
+# STIKERLAR TIZIMI — masalan /start uchun stiker
+# ═══════════════════════════════════════════════════════
+async def get_sticker(event_key: str) -> str | None:
+    try:
+        doc = await settings_col.find_one({"_id": "stickers"})
+        if doc:
+            return doc.get(event_key)
+    except Exception:
+        pass
+    return None
+
+async def set_sticker(event_key: str, file_id: str):
+    await settings_col.update_one({"_id": "stickers"}, {"$set": {event_key: file_id}}, upsert=True)
+
+async def send_event_sticker(chat_id: int, event_key: str):
+    """Agar shu event uchun stiker o'rnatilgan bo'lsa yuboradi, bo'lmasa hech narsa qilmaydi."""
+    sid = await get_sticker(event_key)
+    if sid:
+        try:
+            await bot.send_sticker(chat_id, sid)
+        except Exception as e:
+            logging.warning(f"Stiker yuborishda xato ({event_key}): {e}")
+
+# ═══════════════════════════════════════════════════════
 # STATES
 # ═══════════════════════════════════════════════════════
 class LangSelect(StatesGroup):
@@ -995,6 +1092,19 @@ class OnlineTraderEdit(StatesGroup):
 class RateEdit(StatesGroup):
     usd = State()
     rub = State()
+
+class BFOrder(StatesGroup):
+    nick = State()
+
+class StickerSet(StatesGroup):
+    waiting = State()
+
+class AbuseEdit(StatesGroup):
+    games = State()
+    hour  = State()
+
+class StockEdit(StatesGroup):
+    url = State()
 
 class MuteFlow(StatesGroup):
     user_id  = State()
@@ -1100,8 +1210,10 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_roblox_script"))
     b.button(text=T(lang, "btn_roblox_search"))
     b.button(text=T(lang, "btn_scammers"))
+    b.button(text=T(lang, "btn_bloxfruit"))
+    b.button(text=T(lang, "btn_admin_abuse"))
     b.button(text=T(lang, "btn_change_lang"))
-    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2)
+    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2)
     return b.as_markup(resize_keyboard=True)
 
 def cancel_kb(lang="uz"):
@@ -1314,6 +1426,7 @@ async def post_online_trader_to_channel(uname: str, nick: str, bio: str, photo_i
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message, state: FSMContext):
     uid = msg.from_user.id
+    await send_event_sticker(msg.chat.id, "start")
     # Referal payload tekshirish
     parts = msg.text.split(maxsplit=1)
     payload = parts[1].strip() if len(parts) > 1 else ""
@@ -2958,6 +3071,123 @@ async def cmd_scammers(msg: types.Message, state: FSMContext):
     lang = await get_user_lang(uid)
     await msg.answer(T(lang, "scam_menu_msg"), reply_markup=scam_menu_kb(lang))
 
+# ═══════════════════════════════════════════════════════
+# 🍈 BLOX FRUIT BO'LIMI (Stock + Xizmatlar)
+# ═══════════════════════════════════════════════════════
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_bloxfruit") for l in LANGS)))
+async def cmd_bloxfruit(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    b = InlineKeyboardBuilder()
+    b.button(text="📦 Stock", callback_data="bf_stock")
+    b.button(text="🛠 Xizmatlar", callback_data="bf_services")
+    b.adjust(2)
+    await msg.answer(
+        "🍈 *Blox Fruit bo'limi*\n\n"
+        "📦 *Stock* — omborimizdagi mavjud narsalar joylanadigan kanal\n"
+        "🛠 *Xizmatlar* — level ko'tarish, pul, raid va boshqa xizmatlar\n\n"
+        "👇 Bo'limni tanlang:",
+        reply_markup=b.as_markup()
+    )
+
+@dp.callback_query(F.data == "bf_stock")
+async def cb_bf_stock(cb: types.CallbackQuery):
+    url = await get_bf_stock_channel()
+    b = InlineKeyboardBuilder()
+    b.button(text="📦 Stock kanaliga o'tish", url=url)
+    b.adjust(1)
+    await cb.message.answer(
+        "📦 *Stock*\n\n"
+        "Barcha mavjud narsalar shu kanalda tashlanadi 👇",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
+
+@dp.callback_query(F.data == "bf_services")
+async def cb_bf_services(cb: types.CallbackQuery):
+    b = InlineKeyboardBuilder()
+    for key, label in BF_SERVICES:
+        b.button(text=label, callback_data=key)
+    b.adjust(1)
+    await cb.message.answer(
+        "🛠 *Blox Fruit xizmatlari*\n\n"
+        "🆙 1️⃣ Lvl ko'tarib berish\n"
+        "💰 2️⃣ Pul ko'paytirib berish\n"
+        "🛡 3️⃣ Raidlardan o'tib berish\n"
+        "🍈 4️⃣ Fruit sotiladi\n"
+        "📦 5️⃣ 1+ Storage\n\n"
+        "✅ Boshqa hamma xizmatlarni ham olib beramiz — *akkingizga kirib o'tirmaymiz!*\n\n"
+        "👇 Kerakli xizmatni tanlang:",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("bf_") & ~F.data.in_(["bf_stock", "bf_services"]))
+async def cb_bf_service_pick(cb: types.CallbackQuery, state: FSMContext):
+    key = cb.data
+    if key not in BF_SERVICES_TEXT:
+        await cb.answer()
+        return
+    await state.update_data(bf_service=key)
+    b = InlineKeyboardBuilder()
+    b.button(text="🛒 Buyurtma berish", callback_data="bf_order_start")
+    b.adjust(1)
+    await cb.message.answer(BF_SERVICES_TEXT[key], reply_markup=b.as_markup())
+    await cb.answer()
+
+@dp.callback_query(F.data == "bf_order_start")
+async def cb_bf_order_start(cb: types.CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    lang = await get_user_lang(uid)
+    await cb.message.answer("🎮 Roblox nikingizni va qo'shimcha izohingizni yozing (masalan: nick + xohlagan natija):", reply_markup=cancel_kb(lang))
+    await state.set_state(BFOrder.nick)
+    await cb.answer()
+
+@dp.message(BFOrder.nick)
+async def bf_order_nick(msg: types.Message, state: FSMContext):
+    uid = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    d = await state.get_data()
+    key = d.get("bf_service")
+    label = dict(BF_SERVICES).get(key, key)
+    await state.clear()
+    await msg.answer(
+        f"✅ *Buyurtmangiz qabul qilindi!*\n\n"
+        f"🛠 Xizmat: {label}\n"
+        f"📝 Izoh: {esc_md(msg.text.strip())}\n\n"
+        f"👨‍💻 Tez orada admin siz bilan bog'lanadi.",
+        reply_markup=main_kb(lang)
+    )
+    await notify_role_admins(
+        "bloxfruit",
+        f"🍈 *Yangi Blox Fruit xizmat buyurtmasi*\n\n"
+        f"🛠 Xizmat: {label}\n"
+        f"👤 @{esc_md(msg.from_user.username or '-')} (`{uid}`)\n"
+        f"📝 Izoh: {esc_md(msg.text.strip())}\n"
+        f"🕐 {now()}"
+    )
+
+# ═══════════════════════════════════════════════════════
+# 🎯 ADMIN ABUSELAR BO'LIMI
+# ═══════════════════════════════════════════════════════
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_admin_abuse") for l in LANGS)))
+async def cmd_admin_abuse(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    data = await get_admin_abuse_data()
+    games_txt = "\n".join(data["games"])
+    await msg.answer(
+        f"🎯 *Admin abuselar*\n\n"
+        f"🏆 *Top 10 eng zo'r Roblox o'yinlari:*\n\n"
+        f"{games_txt}\n\n"
+        f"⏰ *Admin abuse vaqti:* {data['hour']}\n\n"
+        f"📌 Vaqtida onlayn bo'lib, imkoniyatni qo'ldan boy bermang!"
+    )
+
 @dp.callback_query(F.data.startswith("scam_list_"))
 async def cb_scam_list(cb: types.CallbackQuery):
     uid  = cb.from_user.id
@@ -3588,7 +3818,10 @@ async def admin_panel_kb():
     b.button(text=f"🚨 Mashkalar ({scam_cnt})",    callback_data="adm_scamlist_0")
     b.button(text="👑 Admin qo'shish",             callback_data="adm_addadmin")
     b.button(text="💱 Valyuta kurslari",           callback_data="adm_rates")
-    b.adjust(2, 2, 2, 2, 2, 1, 1)
+    b.button(text="🎭 /start stikeri",             callback_data="adm_sticker_start")
+    b.button(text="📦 Stock kanal havolasi",       callback_data="adm_stock_url")
+    b.button(text="🎯 Admin abuse tahrirlash",     callback_data="adm_abuse_edit")
+    b.adjust(2, 2, 2, 2, 2, 1, 1, 2, 1)
     return b.as_markup(), cnt, or_, tr, sl
 
 @dp.message(Command("admin"))
@@ -3790,6 +4023,119 @@ async def rate_set_rub(msg: types.Message, state: FSMContext):
         f"✅ Kurslar yangilandi!\n\n🇺🇸 1 USD = {usd_val:,.0f} so'm\n🇷🇺 1 RUB = {val:,.0f} so'm",
         reply_markup=main_kb(lang)
     )
+
+@dp.callback_query(F.data == "adm_sticker_start")
+async def adm_sticker_start(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    await state.update_data(sticker_event="start")
+    await cb.message.answer(
+        "🎭 *`/start` uchun stiker o'rnatish*\n\n"
+        "Botga stiker yuboring — u endi har safar foydalanuvchi `/start` bosganda yuboriladi.",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(StickerSet.waiting)
+    await cb.answer()
+
+@dp.message(StickerSet.waiting, F.sticker)
+async def sticker_set_receive(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    d = await state.get_data()
+    event_key = d.get("sticker_event", "start")
+    await set_sticker(event_key, msg.sticker.file_id)
+    await state.clear()
+    await msg.answer(f"✅ Stiker o'rnatildi! (`{event_key}`)", reply_markup=main_kb(lang))
+
+@dp.message(StickerSet.waiting)
+async def sticker_set_wrong(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    await msg.answer("❗️ Iltimos, aynan *stiker* yuboring (matn emas).")
+
+@dp.callback_query(F.data == "adm_stock_url")
+async def adm_stock_url(cb: types.CallbackQuery, state: FSMContext):
+    if not (is_admin(cb.from_user.id) or is_stock_admin(cb.from_user.id)):
+        return
+    cur = await get_bf_stock_channel()
+    await cb.message.answer(
+        f"📦 *Stock kanal havolasi*\n\nHozirgi: {cur}\n\nYangi havolani yuboring (masalan: `https://t.me/kanalim`):",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(StockEdit.url)
+    await cb.answer()
+
+@dp.message(StockEdit.url)
+async def stock_url_receive(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    url = msg.text.strip()
+    if not (url.startswith("http://") or url.startswith("https://") or url.startswith("@")):
+        await msg.answer("❌ To'g'ri havola yuboring (https:// bilan boshlanishi kerak):")
+        return
+    await set_bf_stock_channel(url)
+    await state.clear()
+    await msg.answer(f"✅ Stock kanal havolasi yangilandi:\n{url}", reply_markup=main_kb(lang))
+
+@dp.callback_query(F.data == "adm_abuse_edit")
+async def adm_abuse_edit(cb: types.CallbackQuery):
+    if not (is_admin(cb.from_user.id) or is_abuse_admin(cb.from_user.id)):
+        return
+    b = InlineKeyboardBuilder()
+    b.button(text="🏆 O'yinlar ro'yxatini tahrirlash", callback_data="adm_abuse_games")
+    b.button(text="⏰ Vaqtni tahrirlash", callback_data="adm_abuse_hour")
+    b.adjust(1)
+    data = await get_admin_abuse_data()
+    await cb.message.answer(
+        f"🎯 *Admin abuse bo'limi*\n\n"
+        f"🏆 Hozirgi o'yinlar:\n" + "\n".join(data["games"]) + f"\n\n⏰ Vaqt: {data['hour']}",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
+
+@dp.callback_query(F.data == "adm_abuse_games")
+async def adm_abuse_games(cb: types.CallbackQuery, state: FSMContext):
+    await cb.message.answer(
+        "🏆 Yangi Top 10 o'yinlar ro'yxatini yuboring, har birini alohida qatorda "
+        "(masalan:\n1. Blox Fruits\n2. Adopt Me!\n...):",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(AbuseEdit.games)
+    await cb.answer()
+
+@dp.message(AbuseEdit.games)
+async def abuse_games_receive(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    lines = [l.strip() for l in msg.text.split("\n") if l.strip()]
+    await set_admin_abuse_games(lines)
+    await state.clear()
+    await msg.answer("✅ O'yinlar ro'yxati yangilandi!", reply_markup=main_kb(lang))
+
+@dp.callback_query(F.data == "adm_abuse_hour")
+async def adm_abuse_hour(cb: types.CallbackQuery, state: FSMContext):
+    await cb.message.answer("⏰ Yangi admin abuse vaqtini yuboring (masalan: `22:00 - 23:00`):", reply_markup=cancel_kb())
+    await state.set_state(AbuseEdit.hour)
+    await cb.answer()
+
+@dp.message(AbuseEdit.hour)
+async def abuse_hour_receive(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    await set_admin_abuse_hour(msg.text.strip())
+    await state.clear()
+    await msg.answer("✅ Vaqt yangilandi!", reply_markup=main_kb(lang))
 
 @dp.callback_query(F.data == "adm_addbal")
 async def adm_addbal(cb: types.CallbackQuery, state: FSMContext):
@@ -4287,6 +4633,9 @@ async def adm_addadmin(cb: types.CallbackQuery):
     b.button(text="🎁 Referal admin",      callback_data="addrole_referral")
     b.button(text="🪙 Robux admin",        callback_data="addrole_robux")
     b.button(text="🚨 Mashkalar admin",    callback_data="addrole_mashka")
+    b.button(text="📦 Stock admin",        callback_data="addrole_stock")
+    b.button(text="🍈 Xizmatlar admin",    callback_data="addrole_bloxfruit")
+    b.button(text="🎯 Admin abuse admin",  callback_data="addrole_abuse")
     b.button(text="📋 Adminlar ro'yxati",  callback_data="adm_listadmins")
     b.button(text="🔙 Admin panel",        callback_data="adm_back")
     b.adjust(1)
@@ -4296,7 +4645,10 @@ async def adm_addadmin(cb: types.CallbackQuery):
         "👑 *Super admin* — hamma narsaga to'liq ruxsat\n"
         "🎁 *Referal admin* — faqat referal/privat server so'rovlarini tasdiqlaydi\n"
         "🪙 *Robux admin* — faqat Robux buyurtmalarini tasdiqlaydi\n"
-        "🚨 *Mashkalar admin* — faqat Mashkalar bo'limini boshqaradi\n\n"
+        "🚨 *Mashkalar admin* — faqat Mashkalar bo'limini boshqaradi\n"
+        "📦 *Stock admin* — Blox Fruit Stock kanal havolasini boshqaradi\n"
+        "🍈 *Xizmatlar admin* — Blox Fruit xizmatlar buyurtmalarini qabul qiladi/tahrirlaydi\n"
+        "🎯 *Admin abuse admin* — Admin abuse bo'limi (o'yinlar/soat) ni tahrirlaydi\n\n"
         "Rolni tanlang, so'ng foydalanuvchi ID raqamini yuborasiz:",
         reply_markup=b.as_markup()
     )
