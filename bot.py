@@ -31,7 +31,7 @@ TRADE_CHANNEL     = "@trade_chanel_uz"
 CARD_NUMBER       = os.getenv("CARD_NUMBER", "9860080394103636")
 CARD_OWNER        = os.getenv("CARD_OWNER", "Mashrapova.D")
 CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_chat_veko")
-ROBLOX_SCRIPT_CHANNEL = os.getenv("ROBLOX_SCRIPT_CHANNEL", "https://t.me/deltauzbrb")
+ROBLOX_SCRIPT_CHANNEL = os.getenv("ROBLOX_SCRIPT_CHANNEL", "https://t.me/deltascriptuz")
 
 ADMIN_IDS = {8866852203, 7405798326}
 
