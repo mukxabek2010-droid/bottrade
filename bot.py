@@ -131,7 +131,7 @@ LANGS = {
         "btn_sales": "📊 Sotuvlar",
         "btn_duel": "⚔️ Duel qo'shish",
         "btn_duel_list": "⚔️ Duel e'lonlar",
-        "btn_roblox_search": "🔎 Roblox qidiruv",
+        "btn_proofs": "✅ Isbotlar",
         "btn_add_trade": "➕ Trade qo'shish",
         "btn_add_sale": "➕ Sotish qo'shish",
         "btn_online": "🌐 Online Traderlar",
@@ -212,7 +212,7 @@ LANGS = {
         "btn_sales": "📊 Sales",
         "btn_duel": "⚔️ Add Duel",
         "btn_duel_list": "⚔️ Duel Ads",
-        "btn_roblox_search": "🔎 Roblox Search",
+        "btn_proofs": "✅ Proofs",
         "btn_add_trade": "➕ Add Trade",
         "btn_add_sale": "➕ Add Sale",
         "btn_online": "🌐 Online Traders",
@@ -293,7 +293,7 @@ LANGS = {
         "btn_sales": "📊 Продажи",
         "btn_duel": "⚔️ Добавить дуэль",
         "btn_duel_list": "⚔️ Дуэль объявления",
-        "btn_roblox_search": "🔎 Roblox поиск",
+        "btn_proofs": "✅ Пруфы",
         "btn_add_trade": "➕ Добавить трейд",
         "btn_add_sale": "➕ Добавить продажу",
         "btn_online": "🌐 Онлайн трейдеры",
@@ -1125,33 +1125,10 @@ class RobloxPlusBuy(StatesGroup):
     nick = State()
     mood = State()
 
-class RobloxSearch(StatesGroup):
-    username  = State()
-    game_name = State()
-
 # ═══════════════════════════════════════════════════════
-# 🔎 ROBLOX QIDIRUV — O'YIN MA'LUMOTLAR BAZASI
+# ISBOTLAR KANALI
 # ═══════════════════════════════════════════════════════
-ROBLOX_GAMES_DATA = {
-    "steal_a_brainrot": {
-        "name": "⚙️ Steal a Brainrot",
-        "universe_id": 6127459142,
-        "brainrots": {
-            "Mewing Cat": {"price": "150,000 so'm", "img": "https://images.rbxcdn.com/f01777d018c65050e047466cfcb5a2cb.png"},
-            "Skibidi Toilet": {"price": "250,000 so'm", "img": "https://images.rbxcdn.com/f01777d018c65050e047466cfcb5a2cb.png"},
-            "Sigma Boy": {"price": "400,000 so'm", "img": "https://images.rbxcdn.com/f01777d018c65050e047466cfcb5a2cb.png"}
-        },
-        "bases": {
-            "Neon Base": "https://images.rbxcdn.com/f01777d018c65050e047466cfcb5a2cb.png",
-            "Underground Bunker": "https://images.rbxcdn.com/f01777d018c65050e047466cfcb5a2cb.png"
-        },
-        "traits": [
-            "⚡️ God Mode (Narxga: x5 multiplier qo'shadi)",
-            "🔥 Lucky Charm (Narxga: x2 multiplier qo'shadi)",
-            "💎 Diamond Skin (Narxga: x3.5 multiplier qo'shadi)"
-        ]
-    }
-}
+PROOFS_CHANNEL = os.getenv("PROOFS_CHANNEL", "@veko_bulldrop")
 
 # ═══════════════════════════════════════════════════════
 # BOT + DP
@@ -1208,7 +1185,7 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_search"))
     b.button(text=T(lang, "btn_referral"))
     b.button(text=T(lang, "btn_roblox_script"))
-    b.button(text=T(lang, "btn_roblox_search"))
+    b.button(text=T(lang, "btn_proofs"))
     b.button(text=T(lang, "btn_scammers"))
     b.button(text=T(lang, "btn_bloxfruit"))
     b.button(text=T(lang, "btn_admin_abuse"))
@@ -5119,302 +5096,22 @@ async def cmd_leaderboard(msg: types.Message, state: FSMContext):
     await msg.answer("\n".join(lines), reply_markup=main_kb(await get_user_lang(msg.from_user.id)))
 
 # ═══════════════════════════════════════════════════════
-# 🔎 ROBLOX QIDIRUV BO'LIMI
+# ✅ ISBOTLAR BO'LIMI
 # ═══════════════════════════════════════════════════════
-def _rbx_get_items_count(user_id, asset_type):
-    url = f"https://inventory.roblox.com/v2/users/{user_id}/inventory/{asset_type}"
-    try:
-        res = requests.get(url, params={"limit": 100}, timeout=10)
-        if res.status_code == 200:
-            return len(res.json().get('data', []))
-        elif res.status_code == 403:
-            return "Yashirilgan 🔒"
-        return 0
-    except Exception:
-        return 0
-
-def _rbx_fetch_user_data(username: str):
-    """Roblox API'dan foydalanuvchi ma'lumotlarini sinxron tarzda yig'adi
-    (asosiy event loopni bloklamaslik uchun asyncio.to_thread bilan chaqiriladi)."""
-    search_url = f"https://users.roblox.com/v1/users/search?keyword={username}&limit=1"
-    res = requests.get(search_url, timeout=10).json()
-    if not res.get('data'):
-        return None
-
-    user_id = res['data'][0]['id']
-    display_name = res['data'][0]['displayName']
-
-    info = requests.get(f"https://users.roblox.com/v1/users/{user_id}", timeout=10).json()
-    bio = info.get('description') or "Bio mavjud emas."
-    created_at = info.get('created', "")
-    try:
-        formatted_date = datetime.strptime(created_at[:10], "%Y-%m-%d").strftime("%d.%m.%Y")
-    except Exception:
-        formatted_date = "Noma'lum"
-
-    t_shirts = _rbx_get_items_count(user_id, 2)
-    shirts = _rbx_get_items_count(user_id, 11)
-    pants = _rbx_get_items_count(user_id, 12)
-
-    try:
-        thumb = requests.get(
-            f"https://thumbnails.roblox.com/v1/users/avatar-bust?userIds={user_id}&size=420x420&format=Png",
-            timeout=10
-        ).json()
-        img = thumb['data'][0]['imageUrl'] if thumb.get('data') else None
-    except Exception:
-        img = None
-    if not img:
-        img = "https://tr.rbxcdn.com/30DAY-AvatarBust-768x768-Png/ch/420/420/AvatarBust.png"
-
-    return {
-        "user_id": user_id, "display_name": display_name, "bio": bio,
-        "formatted_date": formatted_date, "t_shirts": t_shirts,
-        "shirts": shirts, "pants": pants, "img": img
-    }
-
-def _rbx_fetch_game_stats(universe_id):
-    url = f"https://games.roblox.com/v1/games?universeIds={universe_id}"
-    try:
-        res = requests.get(url, timeout=10).json()
-        if res.get('data'):
-            return res['data'][0]['playing'], res['data'][0]['visits']
-        return "Noma'lum", "Noma'lum"
-    except Exception:
-        return "Xatolik yuz berdi", "Noma'lum"
-
-def rbx_search_menu_kb():
-    b = InlineKeyboardBuilder()
-    b.button(text="👤 O'yinchi qidirish (User Search)", callback_data="rbx_user_search")
-    b.button(text="🎮 O'yinlar olami (Game Search)", callback_data="rbx_game_search")
-    b.adjust(1)
-    return b.as_markup()
-
-@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_roblox_search") for l in LANGS)))
-async def cmd_roblox_search(msg: types.Message, state: FSMContext):
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_proofs") for l in LANGS)))
+async def cmd_proofs(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
+    lang = await get_user_lang(msg.from_user.id)
+    b = InlineKeyboardBuilder()
+    b.button(text="✅ Isbotlar kanali", url=f"https://t.me/{PROOFS_CHANNEL.lstrip('@')}")
+    b.adjust(1)
     await msg.answer(
-        "🔎 *Roblox qidiruv*\n\nNima qidirmoqchisiz? Quyidagi bo'limlardan birini tanlang:",
-        reply_markup=rbx_search_menu_kb()
+        f"✅ *Isbotlar*\n\n"
+        f"Bajarilgan buyurtmalar va mijozlarimizning fikr-mulohazalarini "
+        f"{esc_md(PROOFS_CHANNEL)} kanalidan ko'rishingiz mumkin:",
+        reply_markup=b.as_markup()
     )
-
-# ── User Search ─────────────────────────────────────────
-@dp.callback_query(F.data == "rbx_user_search")
-async def rbx_ask_username(cb: types.CallbackQuery, state: FSMContext):
-    await cb.message.answer("👤 Qidirmoqchi bo'lgan odamingizni Roblox nikini (username) yuboring:")
-    await state.set_state(RobloxSearch.username)
-    await cb.answer()
-
-@dp.message(RobloxSearch.username)
-async def rbx_get_user(msg: types.Message, state: FSMContext):
-    username = msg.text.strip()
-    if username.startswith('/'):
-        return
-    await state.clear()
-    wait_msg = await msg.answer("⏳ Qidirilmoqda...")
-    try:
-        data = await asyncio.to_thread(_rbx_fetch_user_data, username)
-    except Exception:
-        data = None
-    try:
-        await wait_msg.delete()
-    except Exception:
-        pass
-
-    if not data:
-        await msg.answer("❌ Bunday foydalanuvchi topilmadi. Qaytadan urinib ko'ring.", reply_markup=rbx_search_menu_kb())
-        return
-
-    caption = (
-        f"👤 **Roblox Profil Ma'lumotlari:**\n\n"
-        f"🔹 **Nik:** {esc_md(username)}\n"
-        f"🔹 **Display Name:** {esc_md(data['display_name'])}\n"
-        f"🔹 **ID:** `{data['user_id']}`\n"
-        f"📅 **Ochilgan sana:** {data['formatted_date']}\n"
-        f"📝 **Bio:** {esc_md(data['bio'])}\n\n"
-        f"👕 **Kiyimlar statistikasi:**\n"
-        f"▪️ T-Shortlar: {data['t_shirts']}\n"
-        f"▪️ Ko'ylaklar: {data['shirts']}\n"
-        f"▪️ Shimlar: {data['pants']}"
-    )
-    try:
-        await msg.answer_photo(photo=data['img'], caption=caption)
-    except Exception:
-        await msg.answer(caption)
-    await msg.answer("🔄 Yana qidiruv qilishingiz mumkin:", reply_markup=rbx_search_menu_kb())
-
-# ── Game Search ──────────────────────────────────────────
-@dp.callback_query(F.data == "rbx_game_search")
-async def rbx_ask_game(cb: types.CallbackQuery, state: FSMContext):
-    await cb.message.answer("🎮 Qidirmoqchi bo'lgan o'yin nomini yozing:\n*(Masalan: Steal a Brainrot)*")
-    await state.set_state(RobloxSearch.game_name)
-    await cb.answer()
-
-@dp.message(RobloxSearch.game_name)
-async def rbx_search_games(msg: types.Message, state: FSMContext):
-    await state.clear()
-    query = msg.text.lower().strip()
-    b = InlineKeyboardBuilder()
-    found = False
-    for key, data in ROBLOX_GAMES_DATA.items():
-        if query in data['name'].lower() or query in key.replace('_', ' '):
-            b.button(text=data['name'], callback_data=f"rbx_gmenu_{key}")
-            found = True
-    b.adjust(1)
-    if found:
-        await msg.answer("🎯 Topilgan o'yinlar. Bittasini tanlang:", reply_markup=b.as_markup())
-    else:
-        await msg.answer("❌ Afsuski, bunday o'yin topilmadi.", reply_markup=rbx_search_menu_kb())
-
-@dp.callback_query(F.data.startswith("rbx_gmenu_"))
-async def rbx_show_game_menu(cb: types.CallbackQuery):
-    game_key = cb.data[len("rbx_gmenu_"):]
-    game = ROBLOX_GAMES_DATA.get(game_key)
-    if not game:
-        await cb.answer("❌ O'yin topilmadi!", show_alert=True)
-        return
-    b = InlineKeyboardBuilder()
-    b.button(text="🧠 Brainrotlar", callback_data=f"rbx_br_{game_key}")
-    b.button(text="🏠 Baselar", callback_data=f"rbx_bs_{game_key}")
-    b.button(text="⚡️ Traitlar", callback_data=f"rbx_tr_{game_key}")
-    b.button(text="👥 Online foydalanuvchilar", callback_data=f"rbx_on_{game_key}")
-    b.button(text="⬅️ Orqaga", callback_data="rbx_back_menu")
-    b.adjust(2, 2, 1)
-    text = f"🎮 *{game['name']}* bo'limiga kirdingiz.\n\nNima qidiryapsiz?"
-    try:
-        await cb.message.edit_text(text, reply_markup=b.as_markup())
-    except Exception:
-        await cb.message.answer(text, reply_markup=b.as_markup())
-    await cb.answer()
-
-@dp.callback_query(F.data == "rbx_back_menu")
-async def rbx_back_menu(cb: types.CallbackQuery):
-    try:
-        await cb.message.edit_text(
-            "🔎 *Roblox qidiruv*\n\nNima qidirmoqchisiz?",
-            reply_markup=rbx_search_menu_kb()
-        )
-    except Exception:
-        await cb.message.answer("🔎 *Roblox qidiruv*\n\nNima qidirmoqchisiz?", reply_markup=rbx_search_menu_kb())
-    await cb.answer()
-
-@dp.callback_query(F.data.startswith("rbx_br_"))
-async def rbx_list_brainrots(cb: types.CallbackQuery):
-    game_key = cb.data[len("rbx_br_"):]
-    game = ROBLOX_GAMES_DATA.get(game_key)
-    if not game:
-        await cb.answer("❌ O'yin topilmadi!", show_alert=True)
-        return
-    b = InlineKeyboardBuilder()
-    names = list(game['brainrots'].keys())
-    for i, name in enumerate(names):
-        b.button(text=name, callback_data=f"rbx_vbr_{game_key}_{i}")
-    b.button(text="⬅️ Orqaga", callback_data=f"rbx_gmenu_{game_key}")
-    b.adjust(1)
-    text = "🧠 Hamma mavjud Brainrotlar ro'yxati. Rasm/narxini ko'rish uchun ustiga bosing:"
-    try:
-        await cb.message.edit_text(text, reply_markup=b.as_markup())
-    except Exception:
-        await cb.message.answer(text, reply_markup=b.as_markup())
-    await cb.answer()
-
-@dp.callback_query(F.data.startswith("rbx_vbr_"))
-async def rbx_view_brainrot(cb: types.CallbackQuery):
-    rest = cb.data[len("rbx_vbr_"):]
-    game_key, _, idx_s = rest.rpartition("_")
-    game = ROBLOX_GAMES_DATA.get(game_key)
-    if not game or not idx_s.isdigit():
-        await cb.answer("❌ Xatolik!", show_alert=True)
-        return
-    names = list(game['brainrots'].keys())
-    idx = int(idx_s)
-    if idx >= len(names):
-        await cb.answer("❌ Topilmadi!", show_alert=True)
-        return
-    name = names[idx]
-    info = game['brainrots'][name]
-    caption = f"🧠 **Brainrot:** `{name}`\n💰 **Narxi:** {info['price']}"
-    await cb.message.answer_photo(photo=info['img'], caption=caption)
-    await cb.answer()
-
-@dp.callback_query(F.data.startswith("rbx_bs_"))
-async def rbx_list_bases(cb: types.CallbackQuery):
-    game_key = cb.data[len("rbx_bs_"):]
-    game = ROBLOX_GAMES_DATA.get(game_key)
-    if not game:
-        await cb.answer("❌ O'yin topilmadi!", show_alert=True)
-        return
-    b = InlineKeyboardBuilder()
-    names = list(game['bases'].keys())
-    for i, name in enumerate(names):
-        b.button(text=name, callback_data=f"rbx_vbs_{game_key}_{i}")
-    b.button(text="⬅️ Orqaga", callback_data=f"rbx_gmenu_{game_key}")
-    b.adjust(1)
-    text = "🏠 Hamma mavjud Baselar ro'yxati. Rasmini ko'rish uchun bittasini tanlang:"
-    try:
-        await cb.message.edit_text(text, reply_markup=b.as_markup())
-    except Exception:
-        await cb.message.answer(text, reply_markup=b.as_markup())
-    await cb.answer()
-
-@dp.callback_query(F.data.startswith("rbx_vbs_"))
-async def rbx_view_base(cb: types.CallbackQuery):
-    rest = cb.data[len("rbx_vbs_"):]
-    game_key, _, idx_s = rest.rpartition("_")
-    game = ROBLOX_GAMES_DATA.get(game_key)
-    if not game or not idx_s.isdigit():
-        await cb.answer("❌ Xatolik!", show_alert=True)
-        return
-    names = list(game['bases'].keys())
-    idx = int(idx_s)
-    if idx >= len(names):
-        await cb.answer("❌ Topilmadi!", show_alert=True)
-        return
-    name = names[idx]
-    base_img = game['bases'][name]
-    caption = f"🏠 **Base nomi:** {name}"
-    await cb.message.answer_photo(photo=base_img, caption=caption)
-    await cb.answer()
-
-@dp.callback_query(F.data.startswith("rbx_tr_"))
-async def rbx_list_traits(cb: types.CallbackQuery):
-    game_key = cb.data[len("rbx_tr_"):]
-    game = ROBLOX_GAMES_DATA.get(game_key)
-    if not game:
-        await cb.answer("❌ O'yin topilmadi!", show_alert=True)
-        return
-    traits_text = f"⚡️ *{esc_md(game['name'])} o'yinidagi hamma Traitlar va ko'paytirgichlar (X):*\n\n"
-    for trait in game['traits']:
-        traits_text += f"{esc_md(trait)}\n"
-    b = InlineKeyboardBuilder()
-    b.button(text="⬅️ Orqaga", callback_data=f"rbx_gmenu_{game_key}")
-    try:
-        await cb.message.edit_text(traits_text, reply_markup=b.as_markup())
-    except Exception:
-        await cb.message.answer(traits_text, reply_markup=b.as_markup())
-    await cb.answer()
-
-@dp.callback_query(F.data.startswith("rbx_on_"))
-async def rbx_show_online(cb: types.CallbackQuery):
-    game_key = cb.data[len("rbx_on_"):]
-    game = ROBLOX_GAMES_DATA.get(game_key)
-    if not game:
-        await cb.answer("❌ O'yin topilmadi!", show_alert=True)
-        return
-    await cb.answer("⏳ Tekshirilmoqda...")
-    online_count, visits = await asyncio.to_thread(_rbx_fetch_game_stats, game['universe_id'])
-    text = (
-        f"🎮 *{esc_md(game['name'])} Statistika:*\n\n"
-        f"👥 *Hozir o'yinda (Online):* `{online_count}` ta odam o'ynayapti 🔥\n"
-        f"👁‍🗨 *Jami kirishlar soni (Visits):* {visits}"
-    )
-    b = InlineKeyboardBuilder()
-    b.button(text="⬅️ Orqaga", callback_data=f"rbx_gmenu_{game_key}")
-    try:
-        await cb.message.edit_text(text, reply_markup=b.as_markup())
-    except Exception:
-        await cb.message.answer(text, reply_markup=b.as_markup())
 
 # ═══════════════════════════════════════════════════════
 # POLLING + MAIN
