@@ -49,10 +49,8 @@ ADMIN_ROLE_LABELS = {
     "super":    "👑 Super admin",
     "referral": "🎁 Referal admin",
     "robux":    "🪙 Robux admin",
-    "mashka":   "🚨 Mashkalar admin",
     "stock":    "📦 Stock admin",
     "bloxfruit":"🍈 Xizmatlar admin",
-    "abuse":    "🎯 Admin abuse admin",
 }
 
 # Xotirada keshlanadigan rollar: {user_id: role}
@@ -82,17 +80,11 @@ def is_referral_admin(uid: int) -> bool:
 def is_robux_admin(uid: int) -> bool:
     return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "robux"
 
-def is_mashka_admin(uid: int) -> bool:
-    return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "mashka"
-
 def is_stock_admin(uid: int) -> bool:
     return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "stock"
 
 def is_bloxfruit_admin(uid: int) -> bool:
     return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "bloxfruit"
-
-def is_abuse_admin(uid: int) -> bool:
-    return is_super_admin(uid) or ADMIN_ROLES.get(uid) == "abuse"
 
 def is_any_admin(uid: int) -> bool:
     return is_super_admin(uid) or uid in ADMIN_ROLES
@@ -136,8 +128,6 @@ LANGS = {
         "btn_add_sale": "➕ Sotish qo'shish",
         "btn_online": "🌐 Online Traderlar",
         "btn_cart": "🛒 Savat",
-        "btn_chat": "💬 Chat",
-        "btn_contract": "📜 Shartnoma qilish",
         "btn_ad": "📣 Reklama qilish",
         "btn_admin_service": "🛡 Trade qilib berish",
         "btn_suggest": "💡 Taklif berish",
@@ -145,7 +135,6 @@ LANGS = {
         "btn_referral": "🎁 Referal",
         "btn_change_lang": "🌐 Tilni o'zgartirish",
         "btn_bloxfruit": "🍈 Blox Fruit",
-        "btn_admin_abuse": "🎯 Admin abuselar",
         "sub_msg": "👋 Salom! Botdan foydalanish uchun avval quyidagi kanallarga obuna bo'ling!",
         "sub_confirm": "✅ Obunani tasdiqlash",
         "not_subbed": "❌ Hali barcha kanallarga obuna bo'lmagansiz!",
@@ -173,15 +162,6 @@ LANGS = {
         "btn_roblox_script": "🎮 Roblox Skript",
         "roblox_script_msg": "🎮 *Roblox skriptlar*\n\nEng so'nggi va ishlaydigan skriptlarni olish uchun pastdagi kanalimizga o'ting:",
         "btn_roblox_script_link": "📂 Skriptlar kanali",
-        "btn_scammers": "🚨 Mashkalar",
-        "scam_menu_msg": "🚨 *Mashkalar (firibgarlar) bo'limi*\n\nBu yerda firibgarlik qilgan foydalanuvchilar haqida ma'lumot olishingiz mumkin.",
-        "btn_scam_view": "👀 Mashkalarni ko'rish",
-        "btn_scam_search": "🔍 Qidirish",
-        "scam_search_prompt": "🔍 Tekshirmoqchi bo'lgan foydalanuvchining @username sini yozing:",
-        "scam_write_username": "✍️ @username yozing:",
-        "no_scammers": "🚨 Hozircha mashkalar ro'yxati bo'sh.",
-        "scam_not_found": "✅ Bu foydalanuvchi mashkalar ro'yxatida topilmadi.",
-        "scam_found_warn": "⚠️ *DIQQAT!* Bu foydalanuvchi mashkalar ro'yxatida bor!",
         "choose_trade_category": "🔄 Qaysi o'yindagi tradelarni ko'rmoqchisiz?\n\nKategoriyani tanlang:",
         "choose_sale_category": "📊 Qaysi o'yindagi sotuvlarni ko'rmoqchisiz?\n\nKategoriyani tanlang:",
         "back_to_categories": "🔙 Kategoriyalar",
@@ -217,8 +197,6 @@ LANGS = {
         "btn_add_sale": "➕ Add Sale",
         "btn_online": "🌐 Online Traders",
         "btn_cart": "🛒 Cart",
-        "btn_chat": "💬 Chat",
-        "btn_contract": "📜 Make Contract",
         "btn_ad": "📣 Advertise",
         "btn_admin_service": "🛡 Trade for you",
         "btn_suggest": "💡 Suggestion",
@@ -226,7 +204,6 @@ LANGS = {
         "btn_referral": "🎁 Referral",
         "btn_change_lang": "🌐 Change Language",
         "btn_bloxfruit": "🍈 Blox Fruit",
-        "btn_admin_abuse": "🎯 Admin Abuses",
         "sub_msg": "👋 Hello! Please subscribe to all channels to use the bot!",
         "sub_confirm": "✅ Confirm Subscription",
         "not_subbed": "❌ You haven't subscribed to all channels yet!",
@@ -254,15 +231,6 @@ LANGS = {
         "btn_roblox_script": "🎮 Roblox Script",
         "roblox_script_msg": "🎮 *Roblox Scripts*\n\nTo get the latest working scripts, go to our channel below:",
         "btn_roblox_script_link": "📂 Scripts Channel",
-        "btn_scammers": "🚨 Scammers",
-        "scam_menu_msg": "🚨 *Scammers section*\n\nHere you can check information about users who have scammed others.",
-        "btn_scam_view": "👀 View scammers",
-        "btn_scam_search": "🔍 Search",
-        "scam_search_prompt": "🔍 Enter the @username of the user you want to check:",
-        "scam_write_username": "✍️ Write @username:",
-        "no_scammers": "🚨 The scammers list is currently empty.",
-        "scam_not_found": "✅ This user was not found in the scammers list.",
-        "scam_found_warn": "⚠️ *WARNING!* This user is on the scammers list!",
         "choose_trade_category": "🔄 Which game's trades do you want to see?\n\nChoose a category:",
         "choose_sale_category": "📊 Which game's sales do you want to see?\n\nChoose a category:",
         "back_to_categories": "🔙 Categories",
@@ -298,8 +266,6 @@ LANGS = {
         "btn_add_sale": "➕ Добавить продажу",
         "btn_online": "🌐 Онлайн трейдеры",
         "btn_cart": "🛒 Корзина",
-        "btn_chat": "💬 Чат",
-        "btn_contract": "📜 Заключить контракт",
         "btn_ad": "📣 Реклама",
         "btn_admin_service": "🛡 Трейд за вас",
         "btn_suggest": "💡 Предложение",
@@ -307,7 +273,6 @@ LANGS = {
         "btn_referral": "🎁 Реферал",
         "btn_change_lang": "🌐 Сменить язык",
         "btn_bloxfruit": "🍈 Blox Fruit",
-        "btn_admin_abuse": "🎯 Админ абузы",
         "sub_msg": "👋 Привет! Подпишитесь на все каналы, чтобы использовать бот!",
         "sub_confirm": "✅ Подтвердить подписку",
         "not_subbed": "❌ Вы ещё не подписались на все каналы!",
@@ -335,15 +300,6 @@ LANGS = {
         "btn_roblox_script": "🎮 Roblox Скрипт",
         "roblox_script_msg": "🎮 *Roblox Скрипты*\n\nЧтобы получить последние рабочие скрипты, перейдите в наш канал ниже:",
         "btn_roblox_script_link": "📂 Канал со скриптами",
-        "btn_scammers": "🚨 Мошенники",
-        "scam_menu_msg": "🚨 *Раздел мошенников*\n\nЗдесь вы можете проверить информацию о пользователях, которые обманывали других.",
-        "btn_scam_view": "👀 Посмотреть мошенников",
-        "btn_scam_search": "🔍 Поиск",
-        "scam_search_prompt": "🔍 Введите @username пользователя, которого хотите проверить:",
-        "scam_write_username": "✍️ Напишите @username:",
-        "no_scammers": "🚨 Список мошенников пока пуст.",
-        "scam_not_found": "✅ Этот пользователь не найден в списке мошенников.",
-        "scam_found_warn": "⚠️ *ВНИМАНИЕ!* Этот пользователь есть в списке мошенников!",
         "choose_trade_category": "🔄 Трейды какой игры вы хотите посмотреть?\n\nВыберите категорию:",
         "choose_sale_category": "📊 Продажи какой игры вы хотите посмотреть?\n\nВыберите категорию:",
         "back_to_categories": "🔙 Категории",
@@ -388,7 +344,6 @@ online_traders = mdb["online_traders"]
 mutes_db       = mdb["mutes"]
 trade_cart     = mdb["trade_cart"]
 sale_cart      = mdb["sale_cart"]
-scammers       = mdb["scammers"]
 admins_col     = mdb["admins"]
 duels          = mdb["duels"]
 settings_col   = mdb["settings"]
@@ -404,7 +359,7 @@ async def init_indexes():
     await cooldowns.create_index([("user_id", 1), ("action", 1)], unique=True)
     await online_traders.create_index("user_id", unique=True)
     await mutes_db.create_index("user_id", unique=True)
-    await scammers.create_index("tgid_norm")
+    await pending_refs_db.create_index("user_id", unique=True)
 
 # ═══════════════════════════════════════════════════════
 # HELPERS
@@ -441,25 +396,27 @@ async def upsert_user(uid, uname, lang="uz"):
     await users.update_one({"user_id": uid}, upd, upsert=True)
 
 async def finalize_referral(uid: int, state: FSMContext):
-    """FSM holatida saqlangan pending_ref bo'lsa, foydalanuvchi hali ro'yxatdan
+    """Bazada saqlangan pending referal bo'lsa, foydalanuvchi hali ro'yxatdan
     o'tmagan (yangi) bo'lsa va referal hali biriktirilmagan bo'lsa - referalni yakunlaydi.
     Bu funksiya /start, tilni tanlash va 'obunani tasdiqlash' bosqichlarining hammasida
-    chaqiriladi, shunda obunaga o'tib keyin qaytgan foydalanuvchilar uchun ham referal ishlaydi."""
-    try:
-        data = await state.get_data()
-    except Exception:
-        data = {}
-    ref_uid = data.get("pending_ref")
+    chaqiriladi, shunda obunaga o'tib keyin qaytgan foydalanuvchilar uchun ham referal ishlaydi.
+    Eslatma: bu ma'lumot MongoDB'da saqlanadi (FSM xotirasida emas), shuning uchun bot
+    qayta ishga tushsa ham (Render uyqu holati va h.k.) referal yo'qolmaydi."""
+    pending = await pending_refs_db.find_one({"user_id": uid})
+    ref_uid = pending.get("ref_uid") if pending else None
     if not ref_uid or ref_uid == uid:
         return
     existing_user = await get_user(uid)
     if existing_user:
+        await pending_refs_db.delete_one({"user_id": uid})
         return
     already = await get_referrer(uid)
     if already:
+        await pending_refs_db.delete_one({"user_id": uid})
         return
     inviter = await get_user(ref_uid)
     if not inviter:
+        await pending_refs_db.delete_one({"user_id": uid})
         return
     await set_referrer(uid, ref_uid)
     await add_ref(ref_uid)
@@ -475,10 +432,7 @@ async def finalize_referral(uid: int, state: FSMContext):
         )
     except Exception:
         pass
-    try:
-        await state.update_data(pending_ref=None)
-    except Exception:
-        pass
+    await pending_refs_db.delete_one({"user_id": uid})
 
 async def get_balance(uid):
     u = await users.find_one({"user_id": uid}, {"balance": 1})
@@ -687,40 +641,11 @@ async def set_trader_status(uid: int, is_online: bool):
     )
 
 # ═══════════════════════════════════════════════════════
-# MASHKALAR (SCAMMERS) DB HELPERS
-# ═══════════════════════════════════════════════════════
-async def add_scammer(nick: str, tgid: str, photo_id, added_by: int):
-    norm = tgid.strip().lstrip("@").lower()
-    r = await scammers.insert_one({
-        "nick": nick.strip(),
-        "tgid": tgid.strip(),
-        "tgid_norm": norm,
-        "photo_id": photo_id,
-        "added_by": added_by,
-        "created_at": now()
-    })
-    return r.inserted_id
-
-async def get_scammer(sid):
-    return await scammers.find_one({"_id": ObjectId(str(sid))})
-
-async def all_scammers():
-    return [s async for s in scammers.find({}).sort("_id", -1)]
-
-async def find_scammers_by_username(query: str):
-    norm = query.strip().lstrip("@").lower()
-    if not norm:
-        return []
-    return [s async for s in scammers.find({"tgid_norm": norm})]
-
-async def delete_scammer(sid):
-    await scammers.delete_one({"_id": ObjectId(str(sid))})
-
-# ═══════════════════════════════════════════════════════
 # REFERRAL DB HELPERS
 # ═══════════════════════════════════════════════════════
 referrals_db = mdb["referrals"]
 private_orders_db = mdb["private_orders"]
+pending_refs_db = mdb["pending_refs"]
 
 async def get_ref_count(uid: int) -> int:
     u = await users.find_one({"user_id": uid}, {"ref_count": 1})
@@ -958,27 +883,23 @@ async def get_bf_stock_channel() -> str:
 async def set_bf_stock_channel(url: str):
     await settings_col.update_one({"_id": "bf_stock_channel"}, {"$set": {"url": url}}, upsert=True)
 
-DEFAULT_ADMIN_ABUSE_GAMES = [
-    "1. Blox Fruits", "2. Pet Simulator 99", "3. Adopt Me!", "4. Brookhaven RP",
-    "5. Grow a Garden", "6. Da Hood", "7. Arsenal", "8. Blade Ball",
-    "9. Murder Mystery 2", "10. Anime Vanguards",
+async def remove_sticker(event_key: str):
+    await settings_col.update_one({"_id": "stickers"}, {"$unset": {event_key: ""}})
+
+# Admin panelda boshqarish mumkin bo'lgan bo'limlar ro'yxati: (event_key, label)
+STICKER_SECTIONS = [
+    ("start",         "🚀 /start (xush kelibsiz xabari)"),
+    ("buy",           "🛒 Robux sotib olish"),
+    ("deposit",       "💰 Hisob to'ldirish"),
+    ("trades",        "🔄 Tradelar"),
+    ("sales",         "📊 Sotuvlar"),
+    ("duel_list",     "⚔️ Duel e'lonlar"),
+    ("online",        "🌐 Online Traderlar"),
+    ("referral",      "🎁 Referal"),
+    ("proofs",        "✅ Isbotlar"),
+    ("bloxfruit",     "🍈 Blox Fruit"),
+    ("roblox_script", "🎮 Roblox Skript"),
 ]
-DEFAULT_ADMIN_ABUSE_HOUR = "22:00 - 23:00 (GMT+5, Toshkent vaqti)"
-
-async def get_admin_abuse_data() -> dict:
-    try:
-        doc = await settings_col.find_one({"_id": "admin_abuse"})
-        if doc:
-            return {"games": doc.get("games", DEFAULT_ADMIN_ABUSE_GAMES), "hour": doc.get("hour", DEFAULT_ADMIN_ABUSE_HOUR)}
-    except Exception:
-        pass
-    return {"games": DEFAULT_ADMIN_ABUSE_GAMES, "hour": DEFAULT_ADMIN_ABUSE_HOUR}
-
-async def set_admin_abuse_games(games: list):
-    await settings_col.update_one({"_id": "admin_abuse"}, {"$set": {"games": games}}, upsert=True)
-
-async def set_admin_abuse_hour(hour: str):
-    await settings_col.update_one({"_id": "admin_abuse"}, {"$set": {"hour": hour}}, upsert=True)
 
 # ═══════════════════════════════════════════════════════
 # STIKERLAR TIZIMI — masalan /start uchun stiker
@@ -1060,18 +981,6 @@ class AdminCmd(StatesGroup):
 class AdminRoleAdd(StatesGroup):
     user_id = State()
 
-class ScammerAdd(StatesGroup):
-    nick  = State()
-    tgid  = State()
-    photo = State()
-
-class ScammerSearch(StatesGroup):
-    query = State()
-
-class ContactAdmin(StatesGroup):
-    photo   = State()
-    message = State()
-
 class SuggestBot(StatesGroup):
     photo   = State()
     message = State()
@@ -1098,10 +1007,6 @@ class BFOrder(StatesGroup):
 
 class StickerSet(StatesGroup):
     waiting = State()
-
-class AbuseEdit(StatesGroup):
-    games = State()
-    hour  = State()
 
 class StockEdit(StatesGroup):
     url = State()
@@ -1177,8 +1082,6 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_add_sale"))
     b.button(text=T(lang, "btn_online"))
     b.button(text=T(lang, "btn_cart"))
-    b.button(text=T(lang, "btn_chat"))
-    b.button(text=T(lang, "btn_contract"))
     b.button(text=T(lang, "btn_ad"))
     b.button(text=T(lang, "btn_admin_service"))
     b.button(text=T(lang, "btn_suggest"))
@@ -1186,11 +1089,9 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_referral"))
     b.button(text=T(lang, "btn_roblox_script"))
     b.button(text=T(lang, "btn_proofs"))
-    b.button(text=T(lang, "btn_scammers"))
     b.button(text=T(lang, "btn_bloxfruit"))
-    b.button(text=T(lang, "btn_admin_abuse"))
     b.button(text=T(lang, "btn_change_lang"))
-    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2)
+    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2)
     return b.as_markup(resize_keyboard=True)
 
 def cancel_kb(lang="uz"):
@@ -1417,9 +1318,16 @@ async def cmd_start(msg: types.Message, state: FSMContext):
             ref_uid = None
 
     if ref_uid:
-        # Obunaga o'tib qaytishi mumkin bo'lgani uchun referalni FSM holatida saqlab qo'yamiz -
-        # keyinroq obuna/til tasdiqlangach finalize_referral orqali yakunlanadi.
-        await state.update_data(pending_ref=ref_uid)
+        # Obunaga o'tib qaytishi mumkin bo'lgani uchun referalni MongoDB'da saqlab qo'yamiz
+        # (FSM xotirasi emas — bot qayta ishga tushsa ham yo'qolmasligi uchun).
+        # Faqat foydalanuvchi hali ro'yxatdan o'tmagan bo'lsa va pending yozuv bo'lmasa yozamiz.
+        existing_user = await get_user(uid)
+        if not existing_user:
+            await pending_refs_db.update_one(
+                {"user_id": uid},
+                {"$setOnInsert": {"user_id": uid, "ref_uid": ref_uid}},
+                upsert=True
+            )
 
     missing = await not_subscribed_channels(uid)
     u = await get_user(uid)
@@ -1601,6 +1509,7 @@ async def cmd_deposit(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
     uid = msg.from_user.id
+    await send_event_sticker(msg.chat.id, "deposit")
     lang = await get_user_lang(uid)
     rates = await get_currency_rates()
     b = InlineKeyboardBuilder()
@@ -1778,6 +1687,7 @@ async def cmd_buy(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
     uid = msg.from_user.id
+    await send_event_sticker(msg.chat.id, "buy")
     lang = await get_user_lang(uid)
     bal = await get_balance(uid)
     rates = await get_currency_rates()
@@ -2013,6 +1923,7 @@ async def cmd_trades(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
     uid  = msg.from_user.id
+    await send_event_sticker(msg.chat.id, "trades")
     lang = await get_user_lang(uid)
     items = await active_trades(lang)
     if not items:
@@ -2098,6 +2009,7 @@ async def cmd_duel_list(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
     uid   = msg.from_user.id
+    await send_event_sticker(msg.chat.id, "duel_list")
     lang  = await get_user_lang(uid)
     items = await active_duels()
     if not items:
@@ -2398,6 +2310,7 @@ async def cmd_sales(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
     uid   = msg.from_user.id
+    await send_event_sticker(msg.chat.id, "sales")
     lang  = await get_user_lang(uid)
     items = await active_sales(lang)
     if not items:
@@ -2780,6 +2693,7 @@ async def cb_remove_scart(cb: types.CallbackQuery):
 async def cmd_online_traders(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
+    await send_event_sticker(msg.chat.id, "online")
     b = InlineKeyboardBuilder()
     b.button(text="➕ Trader qo'shish", callback_data="ot_add")
     b.button(text="👥 Online traderlarni ko'rish", callback_data="ot_list")
@@ -2966,17 +2880,6 @@ async def cb_ot_back(cb: types.CallbackQuery):
     await cb.answer()
 
 # ═══════════════════════════════════════════════════════
-# CHAT
-# ═══════════════════════════════════════════════════════
-@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_chat") for l in LANGS)))
-async def cmd_chat(msg: types.Message, state: FSMContext):
-    if not await check_access(msg, state):
-        return
-    b = InlineKeyboardBuilder()
-    b.button(text="💬 Chatga kirish", url=CHAT_LINK)
-    await msg.answer("💬 Rasmiy chatimizga xush kelibsiz!", reply_markup=b.as_markup())
-
-# ═══════════════════════════════════════════════════════
 # 🎮 ROBLOX SKRIPT
 # ═══════════════════════════════════════════════════════
 @dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_roblox_script") for l in LANGS)))
@@ -2984,69 +2887,12 @@ async def cmd_roblox_script(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
     uid  = msg.from_user.id
+    await send_event_sticker(msg.chat.id, "roblox_script")
     lang = await get_user_lang(uid)
     b = InlineKeyboardBuilder()
     b.button(text=T(lang, "btn_roblox_script_link"), url=ROBLOX_SCRIPT_CHANNEL)
     b.adjust(1)
     await msg.answer(T(lang, "roblox_script_msg"), reply_markup=b.as_markup())
-
-# ═══════════════════════════════════════════════════════
-# 🚨 MASHKALAR (SCAMMERS)
-# ═══════════════════════════════════════════════════════
-def scam_menu_kb(lang="uz"):
-    b = InlineKeyboardBuilder()
-    b.button(text=T(lang, "btn_scam_view"), callback_data="scam_list_0")
-    b.button(text=T(lang, "btn_scam_search"), callback_data="scam_search_start")
-    b.adjust(1)
-    return b.as_markup()
-
-async def _send_scammer_page(target, items, page, lang="uz", is_cb=True):
-    s = items[page]
-    caption = (
-        f"🚨 *MASHKA #{page+1}/{len(items)}*\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"👤 *Nik:* {esc_md(s.get('nick','-'))}\n"
-        f"🆔 *ID/Username:* `{esc_md(s.get('tgid','-'))}`\n"
-        f"📅 {s.get('created_at','-')}\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
-    )
-    b = InlineKeyboardBuilder()
-    if page > 0:
-        b.button(text=T(lang, "prev"), callback_data=f"scam_list_{page-1}")
-    if page < len(items) - 1:
-        b.button(text=T(lang, "next"), callback_data=f"scam_list_{page+1}")
-    if isinstance(target, types.CallbackQuery) and is_admin(target.from_user.id):
-        b.button(text="🗑 O'chirish", callback_data=f"scam_del_{s['_id']}")
-    b.adjust(2, 1)
-    if is_cb:
-        await _send_or_edit(target, s.get("photo_id"), caption, b.as_markup())
-    else:
-        if s.get("photo_id"):
-            await target.answer_photo(s["photo_id"], caption=caption, reply_markup=b.as_markup())
-        else:
-            await target.answer(caption, reply_markup=b.as_markup())
-
-async def _send_scammer_result(msg: types.Message, s: dict):
-    caption = (
-        f"⚠️ *MASHKA TOPILDI!*\n"
-        f"━━━━━━━━━━━━━━━━━━━━\n\n"
-        f"👤 *Nik:* {esc_md(s.get('nick','-'))}\n"
-        f"🆔 *ID/Username:* `{esc_md(s.get('tgid','-'))}`\n"
-        f"📅 {s.get('created_at','-')}\n"
-        f"━━━━━━━━━━━━━━━━━━━━"
-    )
-    if s.get("photo_id"):
-        await msg.answer_photo(s["photo_id"], caption=caption)
-    else:
-        await msg.answer(caption)
-
-@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_scammers") for l in LANGS)))
-async def cmd_scammers(msg: types.Message, state: FSMContext):
-    if not await check_access(msg, state):
-        return
-    uid  = msg.from_user.id
-    lang = await get_user_lang(uid)
-    await msg.answer(T(lang, "scam_menu_msg"), reply_markup=scam_menu_kb(lang))
 
 # ═══════════════════════════════════════════════════════
 # 🍈 BLOX FRUIT BO'LIMI (Stock + Xizmatlar)
@@ -3055,6 +2901,7 @@ async def cmd_scammers(msg: types.Message, state: FSMContext):
 async def cmd_bloxfruit(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
+    await send_event_sticker(msg.chat.id, "bloxfruit")
     b = InlineKeyboardBuilder()
     b.button(text="📦 Stock", callback_data="bf_stock")
     b.button(text="🛠 Xizmatlar", callback_data="bf_services")
@@ -3147,224 +2994,6 @@ async def bf_order_nick(msg: types.Message, state: FSMContext):
         f"📝 Izoh: {esc_md(msg.text.strip())}\n"
         f"🕐 {now()}"
     )
-
-# ═══════════════════════════════════════════════════════
-# 🎯 ADMIN ABUSELAR BO'LIMI
-# ═══════════════════════════════════════════════════════
-@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_admin_abuse") for l in LANGS)))
-async def cmd_admin_abuse(msg: types.Message, state: FSMContext):
-    if not await check_access(msg, state):
-        return
-    data = await get_admin_abuse_data()
-    games_txt = "\n".join(data["games"])
-    await msg.answer(
-        f"🎯 *Admin abuselar*\n\n"
-        f"🏆 *Top 10 eng zo'r Roblox o'yinlari:*\n\n"
-        f"{games_txt}\n\n"
-        f"⏰ *Admin abuse vaqti:* {data['hour']}\n\n"
-        f"📌 Vaqtida onlayn bo'lib, imkoniyatni qo'ldan boy bermang!"
-    )
-
-@dp.callback_query(F.data.startswith("scam_list_"))
-async def cb_scam_list(cb: types.CallbackQuery):
-    uid  = cb.from_user.id
-    lang = await get_user_lang(uid)
-    page = int(cb.data[len("scam_list_"):])
-    items = await all_scammers()
-    if not items:
-        await cb.answer(T(lang, "no_scammers"), show_alert=True)
-        return
-    page = max(0, min(page, len(items) - 1))
-    await _send_scammer_page(cb, items, page, lang=lang)
-    await cb.answer()
-
-@dp.callback_query(F.data.startswith("scam_del_"))
-async def cb_scam_del(cb: types.CallbackQuery):
-    if not is_admin(cb.from_user.id):
-        await cb.answer(T(await get_user_lang(cb.from_user.id), "no_permission"), show_alert=True)
-        return
-    sid = cb.data[len("scam_del_"):]
-    await delete_scammer(sid)
-    try:
-        if cb.message.photo:
-            await cb.message.edit_caption("🗑 O'chirildi.")
-        else:
-            await cb.message.edit_text("🗑 O'chirildi.")
-    except Exception:
-        pass
-    await cb.answer("✅ O'chirildi!")
-
-@dp.callback_query(F.data == "scam_search_start")
-async def cb_scam_search_start(cb: types.CallbackQuery, state: FSMContext):
-    uid  = cb.from_user.id
-    lang = await get_user_lang(uid)
-    await cb.message.answer(T(lang, "scam_write_username"), reply_markup=cancel_kb(lang))
-    await state.set_state(ScammerSearch.query)
-    await cb.answer()
-
-@dp.message(ScammerSearch.query)
-async def scam_search_handler(msg: types.Message, state: FSMContext):
-    uid  = msg.from_user.id
-    lang = await get_user_lang(uid)
-    if msg.text == T(lang, "cancel"):
-        await state.clear()
-        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
-        return
-    query = msg.text.strip()
-    await state.clear()
-    results = await find_scammers_by_username(query)
-    if not results:
-        await msg.answer(T(lang, "scam_not_found"), reply_markup=main_kb(lang))
-        return
-    await msg.answer(T(lang, "scam_found_warn"))
-    for s in results:
-        await _send_scammer_result(msg, s)
-    await msg.answer("✅", reply_markup=main_kb(lang))
-
-# ── Admin: Mashka qo'shish ──────────────────────────────
-@dp.callback_query(F.data == "adm_addscam")
-async def adm_addscam(cb: types.CallbackQuery, state: FSMContext):
-    if not is_mashka_admin(cb.from_user.id):
-        return
-    await cb.message.answer("✏️ Mashka (firibgar) nikini yozing:", reply_markup=cancel_kb())
-    await state.set_state(ScammerAdd.nick)
-    await cb.answer()
-
-@dp.message(ScammerAdd.nick)
-async def scam_add_nick(msg: types.Message, state: FSMContext):
-    uid  = msg.from_user.id
-    lang = await get_user_lang(uid)
-    if msg.text == T(lang, "cancel"):
-        await state.clear()
-        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
-        return
-    await state.update_data(scam_nick=msg.text.strip())
-    await msg.answer("🆔 Foydalanuvchi ID yoki @username kiriting:", reply_markup=cancel_kb(lang))
-    await state.set_state(ScammerAdd.tgid)
-
-@dp.message(ScammerAdd.tgid)
-async def scam_add_tgid(msg: types.Message, state: FSMContext):
-    uid  = msg.from_user.id
-    lang = await get_user_lang(uid)
-    if msg.text == T(lang, "cancel"):
-        await state.clear()
-        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
-        return
-    await state.update_data(scam_tgid=msg.text.strip())
-    await msg.answer(T(lang, "photo_prompt"), reply_markup=skip_cancel_kb(lang))
-    await state.set_state(ScammerAdd.photo)
-
-@dp.message(ScammerAdd.photo, F.photo)
-async def scam_add_photo(msg: types.Message, state: FSMContext):
-    uid  = msg.from_user.id
-    lang = await get_user_lang(uid)
-    d    = await state.get_data()
-    sid  = await add_scammer(d["scam_nick"], d["scam_tgid"], msg.photo[-1].file_id, uid)
-    await state.clear()
-    await msg.answer(f"✅ Mashka qo'shildi! #{short_id(sid)}", reply_markup=main_kb(lang))
-
-@dp.message(ScammerAdd.photo)
-async def scam_add_no_photo(msg: types.Message, state: FSMContext):
-    uid  = msg.from_user.id
-    lang = await get_user_lang(uid)
-    if msg.text == T(lang, "cancel"):
-        await state.clear()
-        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
-        return
-    d    = await state.get_data()
-    sid  = await add_scammer(d["scam_nick"], d["scam_tgid"], None, uid)
-    await state.clear()
-    await msg.answer(f"✅ Mashka qo'shildi! #{short_id(sid)}", reply_markup=main_kb(lang))
-
-@dp.callback_query(F.data.startswith("adm_scamlist_"))
-async def adm_scamlist(cb: types.CallbackQuery):
-    if not is_mashka_admin(cb.from_user.id):
-        return
-    lang  = await get_user_lang(cb.from_user.id)
-    page  = int(cb.data[len("adm_scamlist_"):])
-    items = await all_scammers()
-    if not items:
-        await cb.answer(T(lang, "no_scammers"), show_alert=True)
-        return
-    page = max(0, min(page, len(items) - 1))
-    await _send_scammer_page(cb, items, page, lang=lang)
-    await cb.answer()
-
-# ═══════════════════════════════════════════════════════
-# SHARTNOMA QILISH
-# ═══════════════════════════════════════════════════════
-@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_contract") for l in LANGS)))
-async def cmd_contract(msg: types.Message, state: FSMContext):
-    if not await check_access(msg, state):
-        return
-    uid  = msg.from_user.id
-    lang = await get_user_lang(uid)
-    b = InlineKeyboardBuilder()
-    b.button(text="✉️ Adminga xabar yuborish", callback_data="send_admin_msg")
-    b.adjust(1)
-    await msg.answer(
-        "📜 *Shartnoma qilish*\n\n"
-        "👤 Admin: @notalonet\n\n"
-        "💬 Admin bilan shartnoma asosida ishlash uchun quyidagi tugmani bosing.\n"
-        "⏰ 24 soatda 1 marta xabar yuborish mumkin.",
-        reply_markup=b.as_markup()
-    )
-
-@dp.callback_query(F.data == "send_admin_msg")
-async def cb_send_admin_msg(cb: types.CallbackQuery, state: FSMContext):
-    uid  = cb.from_user.id
-    lang = await get_user_lang(uid)
-    ok = await check_cooldown(uid, "contract")
-    if not ok:
-        rem = await cooldown_remaining(uid, "contract")
-        await cb.answer(f"⏰ 24 soatda 1 marta yozsa bo'ladi!\n{rem} kutib turing.", show_alert=True)
-        return
-    await cb.message.answer("📸 Rasm yuboring (ixtiyoriy):", reply_markup=skip_cancel_kb(lang))
-    await state.set_state(ContactAdmin.photo)
-    await cb.answer()
-
-@dp.message(ContactAdmin.photo, F.photo)
-async def contact_photo(msg: types.Message, state: FSMContext):
-    uid  = msg.from_user.id
-    lang = await get_user_lang(uid)
-    await state.update_data(ca_photo=msg.photo[-1].file_id)
-    await msg.answer("✍️ Xabaringizni yozing:", reply_markup=cancel_kb(lang))
-    await state.set_state(ContactAdmin.message)
-
-@dp.message(ContactAdmin.photo)
-async def contact_no_photo(msg: types.Message, state: FSMContext):
-    uid  = msg.from_user.id
-    lang = await get_user_lang(uid)
-    if msg.text == T(lang, "cancel"):
-        await state.clear()
-        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
-        return
-    await state.update_data(ca_photo=None)
-    await msg.answer("✍️ Xabaringizni yozing:", reply_markup=cancel_kb(lang))
-    await state.set_state(ContactAdmin.message)
-
-@dp.message(ContactAdmin.message)
-async def contact_admin_text(msg: types.Message, state: FSMContext):
-    uid  = msg.from_user.id
-    lang = await get_user_lang(uid)
-    if msg.text == T(lang, "cancel"):
-        await state.clear()
-        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
-        return
-    uname = msg.from_user.username or "-"
-    fname = msg.from_user.full_name
-    d     = await state.get_data()
-    photo = d.get("ca_photo")
-    text = (
-        f"📜 *Yangi xabar (Shartnoma)*\n\n"
-        f"👤 Ism: {esc_md(fname)}\n"
-        f"🔗 Username: @{esc_md(uname)}\n"
-        f"🆔 ID: `{uid}`\n\n"
-        f"💬 Xabar:\n{esc_md(msg.text)}"
-    )
-    await notify_admins(text, photo_id=photo)
-    await state.clear()
-    await msg.answer("✅ Xabaringiz adminga yuborildi!", reply_markup=main_kb(lang))
 
 # ═══════════════════════════════════════════════════════
 # ADMINLIK XIZMATI
@@ -3781,7 +3410,6 @@ async def admin_panel_kb():
     sl  = await active_sales()
     or_ = await pending_orders()
     cnt = await users_count()
-    scam_cnt = len(await all_scammers())
     b   = InlineKeyboardBuilder()
     b.button(text=f"📦 Buyurtmalar ({len(or_)})", callback_data="adm_ord")
     b.button(text=f"🔄 Tradelar ({len(tr)})",     callback_data="adm_tr")
@@ -3791,14 +3419,11 @@ async def admin_panel_kb():
     b.button(text="➖ Balans ayirish",             callback_data="adm_subbal")
     b.button(text="🔇 Mute berish",                callback_data="adm_mute")
     b.button(text="👥 Foydalanuvchilar",           callback_data="adm_users_0")
-    b.button(text=f"🚨 Mashka qo'shish",           callback_data="adm_addscam")
-    b.button(text=f"🚨 Mashkalar ({scam_cnt})",    callback_data="adm_scamlist_0")
     b.button(text="👑 Admin qo'shish",             callback_data="adm_addadmin")
     b.button(text="💱 Valyuta kurslari",           callback_data="adm_rates")
-    b.button(text="🎭 /start stikeri",             callback_data="adm_sticker_start")
+    b.button(text="🎭 Stikerlar boshqaruvi",       callback_data="adm_sticker_menu")
     b.button(text="📦 Stock kanal havolasi",       callback_data="adm_stock_url")
-    b.button(text="🎯 Admin abuse tahrirlash",     callback_data="adm_abuse_edit")
-    b.adjust(2, 2, 2, 2, 2, 1, 1, 2, 1)
+    b.adjust(2, 2, 2, 2, 2, 1, 1)
     return b.as_markup(), cnt, or_, tr, sl
 
 @dp.message(Command("admin"))
@@ -3838,17 +3463,6 @@ async def cmd_admin(msg: types.Message):
             f"🪙 *Robux Admin Panel*\n\n"
             f"Bu yerda faqat Robux sotib olish buyurtmalarini "
             f"tasdiqlashingiz yoki rad etishingiz mumkin.",
-            reply_markup=b.as_markup()
-        )
-    elif role == "mashka":
-        scam_cnt = len(await all_scammers())
-        b.button(text="🚨 Mashka qo'shish",        callback_data="adm_addscam")
-        b.button(text=f"🚨 Mashkalar ({scam_cnt})", callback_data="adm_scamlist_0")
-        b.adjust(1)
-        await msg.answer(
-            f"🚨 *Mashkalar Admin Panel*\n\n"
-            f"Bu yerda mashka (firibgar) qo'shishingiz va mashkalar ro'yxatini "
-            f"to'liq boshqarishingiz mumkin.",
             reply_markup=b.as_markup()
         )
 
@@ -4001,27 +3615,67 @@ async def rate_set_rub(msg: types.Message, state: FSMContext):
         reply_markup=main_kb(lang)
     )
 
-@dp.callback_query(F.data == "adm_sticker_start")
-async def adm_sticker_start(cb: types.CallbackQuery, state: FSMContext):
+@dp.callback_query(F.data == "adm_sticker_menu")
+async def adm_sticker_menu(cb: types.CallbackQuery):
     if not is_admin(cb.from_user.id):
         return
-    await state.update_data(sticker_event="start")
+    b = InlineKeyboardBuilder()
+    for key, label in STICKER_SECTIONS:
+        current = await get_sticker(key)
+        mark = "✅" if current else "➖"
+        b.button(text=f"{mark} {label}", callback_data=f"adm_sticker_pick_{key}")
+    b.button(text="🔙 Admin panel", callback_data="adm_back")
+    b.adjust(1)
     await cb.message.answer(
-        "🎭 *`/start` uchun stiker o'rnatish*\n\n"
-        "Botga stiker yuboring — u endi har safar foydalanuvchi `/start` bosganda yuboriladi.",
-        reply_markup=cancel_kb()
+        "🎭 *Stikerlar boshqaruvi*\n\n"
+        "Har bir bo'lim uchun alohida stiker o'rnatishingiz mumkin — foydalanuvchi "
+        "shu bo'limni ochganda stiker avtomatik yuboriladi.\n\n"
+        "✅ — stiker o'rnatilgan   ➖ — stiker yo'q\n\n"
+        "Bo'limni tanlang:",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("adm_sticker_pick_"))
+async def adm_sticker_pick(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    event_key = cb.data[len("adm_sticker_pick_"):]
+    label = dict(STICKER_SECTIONS).get(event_key, event_key)
+    current = await get_sticker(event_key)
+    await state.update_data(sticker_event=event_key)
+    b = InlineKeyboardBuilder()
+    if current:
+        b.button(text="🗑 Stikerni o'chirish", callback_data=f"adm_sticker_del_{event_key}")
+        b.adjust(1)
+    if current:
+        await cb.message.answer_sticker(current)
+    await cb.message.answer(
+        f"🎭 *{esc_md(label)}* uchun stiker o'rnatish\n\n"
+        f"Botga yangi stiker yuboring — u endi shu bo'lim ochilganda yuboriladi.",
+        reply_markup=b.as_markup() if current else cancel_kb()
     )
     await state.set_state(StickerSet.waiting)
     await cb.answer()
+
+@dp.callback_query(F.data.startswith("adm_sticker_del_"))
+async def adm_sticker_del(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    event_key = cb.data[len("adm_sticker_del_"):]
+    await remove_sticker(event_key)
+    await cb.answer("✅ Stiker o'chirildi!", show_alert=True)
+    await adm_sticker_menu(cb)
 
 @dp.message(StickerSet.waiting, F.sticker)
 async def sticker_set_receive(msg: types.Message, state: FSMContext):
     lang = await get_user_lang(msg.from_user.id)
     d = await state.get_data()
     event_key = d.get("sticker_event", "start")
+    label = dict(STICKER_SECTIONS).get(event_key, event_key)
     await set_sticker(event_key, msg.sticker.file_id)
     await state.clear()
-    await msg.answer(f"✅ Stiker o'rnatildi! (`{event_key}`)", reply_markup=main_kb(lang))
+    await msg.answer(f"✅ *{esc_md(label)}* uchun stiker o'rnatildi!", reply_markup=main_kb(lang))
 
 @dp.message(StickerSet.waiting)
 async def sticker_set_wrong(msg: types.Message, state: FSMContext):
@@ -4058,61 +3712,6 @@ async def stock_url_receive(msg: types.Message, state: FSMContext):
     await set_bf_stock_channel(url)
     await state.clear()
     await msg.answer(f"✅ Stock kanal havolasi yangilandi:\n{url}", reply_markup=main_kb(lang))
-
-@dp.callback_query(F.data == "adm_abuse_edit")
-async def adm_abuse_edit(cb: types.CallbackQuery):
-    if not (is_admin(cb.from_user.id) or is_abuse_admin(cb.from_user.id)):
-        return
-    b = InlineKeyboardBuilder()
-    b.button(text="🏆 O'yinlar ro'yxatini tahrirlash", callback_data="adm_abuse_games")
-    b.button(text="⏰ Vaqtni tahrirlash", callback_data="adm_abuse_hour")
-    b.adjust(1)
-    data = await get_admin_abuse_data()
-    await cb.message.answer(
-        f"🎯 *Admin abuse bo'limi*\n\n"
-        f"🏆 Hozirgi o'yinlar:\n" + "\n".join(data["games"]) + f"\n\n⏰ Vaqt: {data['hour']}",
-        reply_markup=b.as_markup()
-    )
-    await cb.answer()
-
-@dp.callback_query(F.data == "adm_abuse_games")
-async def adm_abuse_games(cb: types.CallbackQuery, state: FSMContext):
-    await cb.message.answer(
-        "🏆 Yangi Top 10 o'yinlar ro'yxatini yuboring, har birini alohida qatorda "
-        "(masalan:\n1. Blox Fruits\n2. Adopt Me!\n...):",
-        reply_markup=cancel_kb()
-    )
-    await state.set_state(AbuseEdit.games)
-    await cb.answer()
-
-@dp.message(AbuseEdit.games)
-async def abuse_games_receive(msg: types.Message, state: FSMContext):
-    lang = await get_user_lang(msg.from_user.id)
-    if msg.text == T(lang, "cancel"):
-        await state.clear()
-        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
-        return
-    lines = [l.strip() for l in msg.text.split("\n") if l.strip()]
-    await set_admin_abuse_games(lines)
-    await state.clear()
-    await msg.answer("✅ O'yinlar ro'yxati yangilandi!", reply_markup=main_kb(lang))
-
-@dp.callback_query(F.data == "adm_abuse_hour")
-async def adm_abuse_hour(cb: types.CallbackQuery, state: FSMContext):
-    await cb.message.answer("⏰ Yangi admin abuse vaqtini yuboring (masalan: `22:00 - 23:00`):", reply_markup=cancel_kb())
-    await state.set_state(AbuseEdit.hour)
-    await cb.answer()
-
-@dp.message(AbuseEdit.hour)
-async def abuse_hour_receive(msg: types.Message, state: FSMContext):
-    lang = await get_user_lang(msg.from_user.id)
-    if msg.text == T(lang, "cancel"):
-        await state.clear()
-        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
-        return
-    await set_admin_abuse_hour(msg.text.strip())
-    await state.clear()
-    await msg.answer("✅ Vaqt yangilandi!", reply_markup=main_kb(lang))
 
 @dp.callback_query(F.data == "adm_addbal")
 async def adm_addbal(cb: types.CallbackQuery, state: FSMContext):
@@ -4609,10 +4208,8 @@ async def adm_addadmin(cb: types.CallbackQuery):
     b.button(text="👑 Super admin",        callback_data="addrole_super")
     b.button(text="🎁 Referal admin",      callback_data="addrole_referral")
     b.button(text="🪙 Robux admin",        callback_data="addrole_robux")
-    b.button(text="🚨 Mashkalar admin",    callback_data="addrole_mashka")
     b.button(text="📦 Stock admin",        callback_data="addrole_stock")
     b.button(text="🍈 Xizmatlar admin",    callback_data="addrole_bloxfruit")
-    b.button(text="🎯 Admin abuse admin",  callback_data="addrole_abuse")
     b.button(text="📋 Adminlar ro'yxati",  callback_data="adm_listadmins")
     b.button(text="🔙 Admin panel",        callback_data="adm_back")
     b.adjust(1)
@@ -4622,10 +4219,8 @@ async def adm_addadmin(cb: types.CallbackQuery):
         "👑 *Super admin* — hamma narsaga to'liq ruxsat\n"
         "🎁 *Referal admin* — faqat referal/privat server so'rovlarini tasdiqlaydi\n"
         "🪙 *Robux admin* — faqat Robux buyurtmalarini tasdiqlaydi\n"
-        "🚨 *Mashkalar admin* — faqat Mashkalar bo'limini boshqaradi\n"
         "📦 *Stock admin* — Blox Fruit Stock kanal havolasini boshqaradi\n"
-        "🍈 *Xizmatlar admin* — Blox Fruit xizmatlar buyurtmalarini qabul qiladi/tahrirlaydi\n"
-        "🎯 *Admin abuse admin* — Admin abuse bo'limi (o'yinlar/soat) ni tahrirlaydi\n\n"
+        "🍈 *Xizmatlar admin* — Blox Fruit xizmatlar buyurtmalarini qabul qiladi/tahrirlaydi\n\n"
         "Rolni tanlang, so'ng foydalanuvchi ID raqamini yuborasiz:",
         reply_markup=b.as_markup()
     )
@@ -4747,6 +4342,7 @@ async def cmd_referral(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
     uid   = msg.from_user.id
+    await send_event_sticker(msg.chat.id, "referral")
     lang  = await get_user_lang(uid)
     uname = msg.from_user.username or ""
     ref_link = f"https://t.me/{(await bot.get_me()).username}?start=ref{uid}"
@@ -5102,6 +4698,7 @@ async def cmd_leaderboard(msg: types.Message, state: FSMContext):
 async def cmd_proofs(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
+    await send_event_sticker(msg.chat.id, "proofs")
     lang = await get_user_lang(msg.from_user.id)
     b = InlineKeyboardBuilder()
     b.button(text="✅ Isbotlar kanali", url=f"https://t.me/{PROOFS_CHANNEL.lstrip('@')}")
