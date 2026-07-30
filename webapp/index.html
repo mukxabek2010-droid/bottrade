@@ -1,158 +1,392 @@
 <!DOCTYPE html>
 <html lang="uz">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BotTrade Profile</title>
-    <!-- Telegram Web App SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Poppins', sans-serif;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<title>Yutuqli o'yin</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;700;800&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-deep:#0c0a1a;
+    --bg-mid:#171235;
+    --violet:#7c5cff;
+    --violet-2:#5b3df0;
+    --gold:#ffc93c;
+    --gold-2:#ff9d3c;
+    --ink:#f4f2ff;
+    --ink-dim:rgba(244,242,255,.62);
+    --card:rgba(255,255,255,.06);
+    --card-line:rgba(255,255,255,.10);
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    min-height:100vh;
+    font-family:'Manrope',system-ui,sans-serif;
+    color:var(--ink);
+    background:
+      radial-gradient(1000px 500px at 15% -8%, rgba(255,201,60,.16), transparent 60%),
+      radial-gradient(900px 600px at 100% 0%, rgba(124,92,255,.28), transparent 55%),
+      linear-gradient(180deg, var(--bg-deep) 0%, var(--bg-mid) 45%, var(--bg-deep) 100%);
+    background-attachment:fixed;
+    overflow-x:hidden;
+  }
+  /* Orqa fonda suzib yuruvchi yumshoq shakllar */
+  .aura{
+    position:fixed; border-radius:50%; filter:blur(60px); opacity:.35; z-index:0; pointer-events:none;
+  }
+  .aura.a1{width:260px;height:260px; background:var(--violet); top:-60px; right:-60px; animation:float1 12s ease-in-out infinite;}
+  .aura.a2{width:220px;height:220px; background:var(--gold); bottom:10%; left:-70px; animation:float2 14s ease-in-out infinite;}
+  @keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(-18px,22px)}}
+  @keyframes float2{0%,100%{transform:translate(0,0)}50%{transform:translate(16px,-18px)}}
 
-        body {
-            background-color: #0b0e14;
-            color: #ffffff;
-            padding: 15px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+  .wrap{
+    position:relative; z-index:1;
+    max-width:480px; margin:0 auto;
+    padding: calc(16px + var(--safe-top)) 16px calc(28px + var(--safe-bottom));
+    min-height:100vh;
+    display:flex; flex-direction:column; gap:16px;
+  }
 
-        /* Profil Kartochkasi */
-        .profile-card {
-            width: 100%;
-            max-width: 400px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 16px;
-            padding: 16px;
-            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
-        }
+  /* ── HEADER: avatar + ism + id ── */
+  .header{
+    display:flex; align-items:center; gap:12px;
+    background:var(--card);
+    border:1px solid var(--card-line);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+    border-radius:20px;
+    padding:12px 14px;
+  }
+  .avatar-ring{
+    width:52px;height:52px; border-radius:50%;
+    padding:2px;
+    background:linear-gradient(135deg,var(--gold),var(--violet));
+    flex-shrink:0;
+  }
+  .avatar{
+    width:100%;height:100%;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    background:var(--bg-mid); color:var(--gold);
+    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px;
+    object-fit:cover;
+  }
+  .who{min-width:0; flex:1;}
+  .who .name{
+    font-weight:800; font-size:15.5px; line-height:1.25;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .who .idrow{
+    display:flex; align-items:center; gap:6px; margin-top:3px;
+  }
+  .who .idbadge{
+    font-family:'Space Grotesk',monospace; font-size:11.5px;
+    color:var(--ink-dim);
+    background:rgba(255,255,255,.06);
+    border:1px solid var(--card-line);
+    padding:2px 8px; border-radius:20px;
+  }
+  .who .uname{ font-size:12px; color:var(--ink-dim); }
+  .trophy{
+    font-size:22px; margin-left:auto; flex-shrink:0;
+    filter:drop-shadow(0 0 10px rgba(255,201,60,.55));
+  }
 
-        /* Tepadagi Header: Rasm + Nick */
-        .profile-header {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            margin-bottom: 15px;
-        }
+  /* ── BALANS ── */
+  .balance-card{
+    position:relative; overflow:hidden;
+    border-radius:22px; padding:18px 18px;
+    background:linear-gradient(135deg, rgba(124,92,255,.35), rgba(255,201,60,.18)), var(--card);
+    border:1px solid rgba(255,201,60,.35);
+  }
+  .balance-card::after{
+    content:""; position:absolute; inset:0;
+    background:radial-gradient(220px 120px at 90% -20%, rgba(255,255,255,.18), transparent 60%);
+    pointer-events:none;
+  }
+  .balance-label{
+    font-size:12.5px; color:var(--ink-dim); letter-spacing:.03em;
+    display:flex; align-items:center; gap:6px;
+  }
+  .balance-row{
+    display:flex; align-items:center; gap:12px; margin-top:6px;
+  }
+  .balance-amount{
+    font-family:'Space Grotesk',sans-serif; font-weight:700;
+    font-size:clamp(24px, 7vw, 30px);
+    letter-spacing:.01em;
+    cursor:pointer; user-select:none;
+    display:flex; align-items:baseline; gap:6px;
+    flex:1; min-width:0;
+  }
+  .balance-amount .unit{font-size:13px; font-weight:500; color:var(--ink-dim);}
+  .plus-btn{
+    flex-shrink:0;
+    width:44px;height:44px; border-radius:50%; border:none;
+    background:linear-gradient(135deg,var(--gold),var(--gold-2));
+    color:#231400; font-size:22px; font-weight:800;
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    box-shadow:0 6px 18px rgba(255,157,60,.35);
+    transition:transform .15s ease;
+    animation:pulse 2.4s ease-in-out infinite;
+  }
+  .plus-btn:active{transform:scale(.92);}
+  @keyframes pulse{
+    0%,100%{box-shadow:0 6px 18px rgba(255,157,60,.35);}
+    50%{box-shadow:0 6px 26px rgba(255,157,60,.6);}
+  }
+  .balance-hint{margin-top:8px; font-size:11.5px; color:var(--ink-dim);}
 
-        /* TO'RTBURCHAK AVATAR */
-        .avatar {
-            width: 55px;
-            height: 55px;
-            border-radius: 12px; /* To'rtburchak burchaklari sal yumshatilgan */
-            object-fit: cover;
-            border: 2px solid #7928ca;
-            background-color: #1a1d26;
-        }
+  /* ── O'YIN QISMI ── */
+  .section-title{
+    font-family:'Space Grotesk',sans-serif; font-weight:700;
+    font-size:15px; margin: 6px 2px 0; display:flex; align-items:center; gap:8px;
+  }
+  .game-card{
+    background:var(--card); border:1px solid var(--card-line);
+    border-radius:22px; padding:22px 16px 20px;
+    display:flex; flex-direction:column; align-items:center; gap:16px;
+  }
+  .wheel-wrap{ position:relative; width:min(78vw, 260px); aspect-ratio:1/1; }
+  .wheel-pointer{
+    position:absolute; top:-6px; left:50%; transform:translateX(-50%);
+    width:0;height:0; z-index:2;
+    border-left:11px solid transparent; border-right:11px solid transparent;
+    border-top:18px solid var(--gold);
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));
+  }
+  .wheel{
+    width:100%; height:100%; border-radius:50%;
+    border:4px solid rgba(255,201,60,.55);
+    transform:rotate(0deg);
+    transition:transform 4.2s cubic-bezier(.17,.9,.15,1);
+    box-shadow:0 0 0 6px rgba(124,92,255,.12), inset 0 0 30px rgba(0,0,0,.35);
+  }
+  .wheel svg{width:100%;height:100%;display:block;border-radius:50%;}
+  .hub{
+    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+    width:20%; height:20%; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, #fff2c7, var(--gold) 60%, var(--gold-2));
+    box-shadow:0 0 12px rgba(255,201,60,.7); z-index:2;
+  }
+  .spin-btn{
+    width:100%; padding:14px; border:none; border-radius:16px;
+    background:linear-gradient(135deg,var(--violet),var(--violet-2));
+    color:#fff; font-weight:800; font-size:15px; letter-spacing:.02em;
+    cursor:pointer; box-shadow:0 8px 22px rgba(91,61,240,.4);
+    transition:transform .12s ease, opacity .2s ease;
+  }
+  .spin-btn:active{transform:scale(.98);}
+  .spin-btn:disabled{opacity:.45; cursor:not-allowed;}
+  .result{
+    min-height:20px; font-size:13.5px; color:var(--ink-dim); text-align:center;
+  }
+  .result b{color:var(--gold);}
 
-        .user-info {
-            display: flex;
-            flex-direction: column;
-        }
+  .foot-note{
+    text-align:center; font-size:11px; color:rgba(244,242,255,.4);
+    margin-top:auto; padding-top:6px;
+  }
 
-        .nickname {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #ffffff;
-        }
-
-        .username-tag {
-            font-size: 0.8rem;
-            color: #8f94a6;
-        }
-
-        /* Chiziq */
-        .divider {
-            height: 1px;
-            background: rgba(255, 255, 255, 0.08);
-            margin-bottom: 15px;
-        }
-
-        /* Balans Bo'limi */
-        .balance-box {
-            background: linear-gradient(135deg, rgba(121, 40, 202, 0.15), rgba(0, 223, 216, 0.05));
-            border: 1px solid rgba(0, 223, 216, 0.2);
-            border-radius: 12px;
-            padding: 12px 16px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .balance-label {
-            font-size: 0.85rem;
-            color: #a0a5c0;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .balance-value {
-            font-size: 1.3rem;
-            font-weight: 700;
-            color: #00dfd8;
-        }
-    </style>
+  @media (min-width:700px){
+    .wrap{padding-top:40px;}
+    .header{padding:16px 18px;}
+    .balance-card{padding:24px;}
+  }
+</style>
 </head>
 <body>
+  <div class="aura a1"></div>
+  <div class="aura a2"></div>
 
-    <div class="profile-card">
-        <!-- Tepasi: To'rtburchak rasm va Nick -->
-        <div class="profile-header">
-            <img id="user-avatar" class="avatar" src="https://via.placeholder.com/150/7928ca/ffffff?text=User" alt="Avatar">
-            <div class="user-info">
-                <span id="user-nick" class="nickname">Yuklanmoqda...</span>
-                <span id="user-tag" class="username-tag">@username</span>
-            </div>
+  <div class="wrap">
+
+    <!-- ── FOYDALANUVCHI HEADER: rasm, ism, ID ── -->
+    <div class="header">
+      <div class="avatar-ring">
+        <img class="avatar" id="avatarImg" alt="" style="display:none;">
+        <div class="avatar" id="avatarFallback">?</div>
+      </div>
+      <div class="who">
+        <div class="name" id="userName">Yuklanmoqda...</div>
+        <div class="idrow">
+          <span class="idbadge" id="userId">ID —</span>
+          <span class="uname" id="userUname"></span>
         </div>
-
-        <div class="divider"></div>
-
-        <!-- Pasti: Balans -->
-        <div class="balance-box">
-            <span class="balance-label">Hisob balansi:</span>
-            <span id="user-balance" class="balance-value">0 so'm</span>
-        </div>
+      </div>
+      <div class="trophy">🏆</div>
     </div>
 
-    <script>
-        const tg = window.Telegram.WebApp;
-        tg.expand();
+    <!-- ── BALANS (botdagi profil balansi bilan bir xil) ── -->
+    <div class="balance-card">
+      <div class="balance-label">💰 Balansingiz</div>
+      <div class="balance-row">
+        <div class="balance-amount" id="balanceBtn">
+          <span id="balanceValue">—</span>
+          <span class="unit">so'm</span>
+        </div>
+        <button class="plus-btn" id="plusBtn" aria-label="Hisobni to'ldirish">+</button>
+      </div>
+      <div class="balance-hint">Balansga bosing yoki + tugmasini bosing — hisobni to'ldirish botda ochiladi</div>
+    </div>
 
-        // Telegram foydalanuvchisi ma'lumotlari
-        const user = tg.initDataUnsafe?.user;
+    <!-- ── YUTUQLI O'YIN ── -->
+    <div class="section-title">🎡 Omad g'ildiragi</div>
+    <div class="game-card">
+      <div class="wheel-wrap">
+        <div class="wheel-pointer"></div>
+        <div class="wheel" id="wheel">
+          <svg viewBox="0 0 100 100"></svg>
+        </div>
+        <div class="hub"></div>
+      </div>
+      <button class="spin-btn" id="spinBtn">🎰 Aylantirish</button>
+      <div class="result" id="spinResult">Kuningizga omad tilaymiz!</div>
+    </div>
 
-        if (user) {
-            // Niki va Username
-            document.getElementById('user-nick').innerText = user.first_name + (user.last_name ? ' ' + user.last_name : '');
-            document.getElementById('user-tag').innerText = user.username ? `@${user.username}` : `ID: ${user.id}`;
-            
-            // Profil rasmi (bo'lsa Telegramniki, bo'lmasa standart)
-            if (user.photo_url) {
-                document.getElementById('user-avatar').src = user.photo_url;
-            }
-        } else {
-            document.getElementById('user-nick').innerText = "Test Foydalanuvchi";
-            document.getElementById('user-tag').innerText = "@test_user";
-        }
+    <div class="foot-note">Roblox Trade &amp; Robux — Yutuqli o'yin</div>
+  </div>
 
-        // URL parametrlaridan balansni o'qib olish (Masalan: site.com/?balance=50000)
-        const urlParams = new URLSearchParams(window.location.search);
-        const userBalance = urlParams.get('balance');
+<script>
+(function(){
+  const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
+  if (tg) { tg.ready(); tg.expand(); }
 
-        if (userBalance !== null) {
-            // Balansni chiroyli formatda ko'rsatish (masalan: 50 000 so'm)
-            document.getElementById('user-balance').innerText = Number(userBalance).toLocaleString('uz-UZ') + " so'm";
-        } else {
-            document.getElementById('user-balance').innerText = "0 so'm";
-        }
-    </script>
+  // ── 1) Darhol ko'rsatish: Telegram bergan user ma'lumotlari (tez) ──
+  const tgUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
+
+  const nameEl = document.getElementById('userName');
+  const idEl = document.getElementById('userId');
+  const unameEl = document.getElementById('userUname');
+  const avatarImg = document.getElementById('avatarImg');
+  const avatarFallback = document.getElementById('avatarFallback');
+
+  function initials(str){
+    if(!str) return '?';
+    return str.trim().split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase();
+  }
+
+  if (tgUser) {
+    const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') || 'Foydalanuvchi';
+    nameEl.textContent = fullName;
+    idEl.textContent = 'ID ' + tgUser.id;
+    unameEl.textContent = tgUser.username ? ('@' + tgUser.username) : '';
+    if (tgUser.photo_url) {
+      avatarImg.src = tgUser.photo_url;
+      avatarImg.style.display = 'block';
+      avatarFallback.style.display = 'none';
+      avatarImg.onerror = function(){ avatarImg.style.display='none'; avatarFallback.style.display='flex'; };
+    } else {
+      avatarFallback.textContent = initials(fullName);
+    }
+  } else {
+    // Web App tashqarisida ochilsa (masalan brauzerda test qilinsa)
+    nameEl.textContent = 'Mehmon';
+    idEl.textContent = 'ID —';
+  }
+
+  // ── 2) Haqiqiy balansni backend'dan olish (bot profilidagi bilan bir xil) ──
+  const balanceValueEl = document.getElementById('balanceValue');
+
+  function formatFallback(n){
+    try { return Number(n).toLocaleString('ru-RU'); } catch(e){ return n; }
+  }
+
+  async function loadBalance(){
+    if (!tg || !tg.initData) { balanceValueEl.textContent = '0'; return; }
+    try {
+      const res = await fetch('/webapp/api/me?initData=' + encodeURIComponent(tg.initData));
+      if (!res.ok) throw new Error('unauthorized');
+      const data = await res.json();
+      balanceValueEl.textContent = formatFallback(data.balance || 0);
+    } catch (e) {
+      balanceValueEl.textContent = '0';
+    }
+  }
+  loadBalance();
+
+  // ── 3) Balans / + bosilganda — botdagi hisob to'ldirish oqimini ochish ──
+  function openDeposit(){
+    if (!tg) return;
+    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    tg.sendData(JSON.stringify({ action: 'open_deposit' }));
+    tg.close();
+  }
+  document.getElementById('plusBtn').addEventListener('click', openDeposit);
+  document.getElementById('balanceBtn').addEventListener('click', openDeposit);
+
+  // ── 4) Omad g'ildiragi (demo o'yin — kunlik 1 marta) ──
+  const PRIZES = [
+    { label: '🎉 Omad!',        color: '#7c5cff' },
+    { label: '🔄 Qayta urin',   color: '#3b2f78' },
+    { label: '💎 Bonus',        color: '#ffc93c' },
+    { label: '🔄 Qayta urin',   color: '#3b2f78' },
+    { label: '⭐ Omad!',         color: '#5b3df0' },
+    { label: '🔄 Qayta urin',   color: '#3b2f78' },
+    { label: '🍀 Katta omad',   color: '#ff9d3c' },
+    { label: '🔄 Qayta urin',   color: '#3b2f78' },
+  ];
+
+  function buildWheelSVG(){
+    const svg = document.querySelector('#wheel svg');
+    const n = PRIZES.length, cx = 50, cy = 50, r = 50;
+    let html = '';
+    for (let i = 0; i < n; i++) {
+      const a0 = (i / n) * 2 * Math.PI - Math.PI/2;
+      const a1 = ((i+1) / n) * 2 * Math.PI - Math.PI/2;
+      const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);
+      const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+      html += `<path d="M${cx},${cy} L${x0},${y0} A${r},${r} 0 0,1 ${x1},${y1} Z" fill="${PRIZES[i].color}" stroke="rgba(0,0,0,.25)" stroke-width="0.5"/>`;
+    }
+    svg.innerHTML = html;
+  }
+  buildWheelSVG();
+
+  const spinBtn = document.getElementById('spinBtn');
+  const wheelEl = document.getElementById('wheel');
+  const resultEl = document.getElementById('spinResult');
+  const SPIN_KEY = 'lucky_spin_last_date';
+
+  function today(){ return new Date().toISOString().slice(0,10); }
+
+  function refreshSpinAvailability(){
+    const last = localStorage.getItem(SPIN_KEY);
+    if (last === today()) {
+      spinBtn.disabled = true;
+      spinBtn.textContent = '⏳ Ertaga qayta urining';
+      resultEl.innerHTML = 'Bugungi urinishingiz ishlatildi. Ertaga qaytib keling!';
+    }
+  }
+  refreshSpinAvailability();
+
+  let spinning = false, currentRotation = 0;
+  spinBtn.addEventListener('click', function(){
+    if (spinning || spinBtn.disabled) return;
+    spinning = true;
+    spinBtn.disabled = true;
+    const idx = Math.floor(Math.random() * PRIZES.length);
+    const segAngle = 360 / PRIZES.length;
+    const targetCenter = idx * segAngle + segAngle/2;
+    const extraSpins = 5 * 360;
+    currentRotation += extraSpins + (360 - targetCenter) - (currentRotation % 360);
+    wheelEl.style.transform = `rotate(${currentRotation}deg)`;
+    resultEl.textContent = 'Aylanmoqda...';
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+
+    setTimeout(function(){
+      resultEl.innerHTML = 'Natija: <b>' + PRIZES[idx].label + '</b>';
+      localStorage.setItem(SPIN_KEY, today());
+      spinning = false;
+      refreshSpinAvailability();
+      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    }, 4300);
+  });
+})();
+</script>
 </body>
 </html>
