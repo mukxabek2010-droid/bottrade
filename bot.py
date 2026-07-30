@@ -3,7 +3,10 @@ import asyncio
 import logging
 import base64
 import hashlib
+import hmac
+import json
 import requests
+from urllib.parse import parse_qsl
 from io import BytesIO
 from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -451,6 +454,33 @@ def esc_md(text) -> str:
     for ch in ("_", "*", "`", "["):
         text = text.replace(ch, "\\" + ch)
     return text
+
+def verify_webapp_init_data(init_data: str, bot_token: str) -> dict | None:
+    """Telegram Web App yuborgan initData'ni tasdiqlaydi (Telegram hujjatidagi
+    rasmiy algoritm bo'yicha). To'g'ri bo'lsa — ichidagi 'user' obyektini va
+    boshqa maydonlarni qaytaradi, aks holda None."""
+    if not init_data:
+        return None
+    try:
+        parsed = dict(parse_qsl(init_data, strict_parsing=True))
+    except ValueError:
+        return None
+    recv_hash = parsed.pop("hash", None)
+    if not recv_hash:
+        return None
+    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+    secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    calc_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(calc_hash, recv_hash):
+        return None
+    result = dict(parsed)
+    if "user" in result:
+        try:
+            result["user"] = json.loads(result["user"])
+        except Exception:
+            result["user"] = {}
+    return result
+
 
 async def get_user(uid):
     return await users.find_one({"user_id": uid})
@@ -1587,12 +1617,11 @@ async def cb_my_sales(cb: types.CallbackQuery):
 # ═══════════════════════════════════════════════════════
 # HISOB TO'LDIRISH
 # ═══════════════════════════════════════════════════════
-@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_deposit") for l in LANGS)))
-async def cmd_deposit(msg: types.Message, state: FSMContext):
-    if not await check_access(msg, state):
-        return
+async def send_deposit_menu(msg: types.Message):
+    """Hisob to'ldirish miqdorlari menyusini chiqaradi. Bot ichidagi '💰 Hisob
+    to'ldirish' tugmasidan ham, Yutuqli o'yin Web App'idagi balans/+ tugmasidan
+    ham xuddi shu funksiya chaqiriladi — ikkalasida ham bir xil oqim ishlaydi."""
     uid = msg.from_user.id
-    await send_event_sticker(msg.chat.id, "deposit")
     lang = await get_user_lang(uid)
     rates = await get_currency_rates()
     b = InlineKeyboardBuilder()
@@ -1604,6 +1633,29 @@ async def cmd_deposit(msg: types.Message, state: FSMContext):
     b.button(text="✏️ Boshqa miqdor", callback_data="damt_custom")
     b.adjust(2)
     await msg.answer("💰 *Hisob to'ldirish*\n\n📌 To'lov karta orqali FAQAT so'mda qabul qilinadi (qavs ichida taxminiy ekvivalent ko'rsatilgan).\n\nQancha to'ldirmoqchisiz?", reply_markup=b.as_markup())
+
+
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_deposit") for l in LANGS)))
+async def cmd_deposit(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    await send_event_sticker(msg.chat.id, "deposit")
+    await send_deposit_menu(msg)
+
+
+@dp.message(F.web_app_data)
+async def on_webapp_data(msg: types.Message, state: FSMContext):
+    """Yutuqli o'yin Web App'idan (masalan, balans ustidagi '+' tugmasidan)
+    kelgan ma'lumotni qabul qiladi. Web App tg.sendData(...) chaqirganda,
+    Telegram bu xabarni oddiy chat xabari sifatida botga yuboradi."""
+    try:
+        payload = json.loads(msg.web_app_data.data)
+    except Exception:
+        payload = {}
+    if payload.get("action") == "open_deposit":
+        if not await check_access(msg, state):
+            return
+        await send_deposit_menu(msg)
 
 @dp.callback_query(F.data.startswith("damt_"))
 async def cb_damt(cb: types.CallbackQuery, state: FSMContext):
@@ -5917,7 +5969,39 @@ async def _run_health_server():
         return web.Response(text="OK - bot ishlayapti (polling)")
 
     app.router.add_get("/", health)
+
+    # ── 🏆 Yutuqli o'yin Web App uchun balans API ──
+    # Web App sahifasi shu endpoint orqali foydalanuvchining bot bazasidagi
+    # HAQIQIY balansini oladi (bot profilidagi balans bilan bir xil, birlashgan).
+    async def webapp_api_me(request: web.Request):
+        init_data = request.query.get("initData", "")
+        verified = verify_webapp_init_data(init_data, BOT_TOKEN or "")
+        if not verified or not verified.get("user"):
+            return web.json_response({"error": "unauthorized"}, status=401)
+        tg_user = verified["user"]
+        uid = tg_user.get("id")
+        if not uid:
+            return web.json_response({"error": "unauthorized"}, status=401)
+        await upsert_user(uid, tg_user.get("username", ""))
+        u = await get_user(uid)
+        lang = (u or {}).get("lang", "uz")
+        balance = (u or {}).get("balance", 0)
+        return web.json_response({
+            "user_id": uid,
+            "username": (u or {}).get("username") or tg_user.get("username") or "",
+            "first_name": tg_user.get("first_name", ""),
+            "last_name": tg_user.get("last_name", ""),
+            "photo_url": tg_user.get("photo_url", ""),
+            "balance": balance,
+            "balance_str": await format_money(balance, lang),
+            "total_deposited": (u or {}).get("total_deposited", 0),
+        })
+
+    app.router.add_get("/webapp/api/me", webapp_api_me)
+
     # 🏆 Yutuqli o'yin uchun Web App fayllarini xizmat qilish (webapp/index.html)
+    # Eslatma: statik fayllar API'dan KEYIN ro'yxatdan o'tkaziladi, aks holda
+    # '/webapp/api/me' so'rovi statik handlerga tushib qolishi mumkin edi.
     webapp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
     if os.path.isdir(webapp_dir):
         app.router.add_static("/webapp/", webapp_dir, show_index=False)
