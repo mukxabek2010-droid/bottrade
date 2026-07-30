@@ -3,11 +3,8 @@ import asyncio
 import logging
 import base64
 import hashlib
-import hmac
-import json
 import requests
 from io import BytesIO
-from urllib.parse import parse_qsl
 from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
@@ -520,70 +517,6 @@ async def add_balance(uid, amt):
 
 async def sub_balance(uid, amt):
     await users.update_one({"user_id": uid}, {"$inc": {"balance": -amt}})
-
-# ═══════════════════════════════════════════════════════
-# WEBAPP API: Telegram initData tekshiruvi va balans sinxronizatsiyasi
-# (webapp/index.html shu yerdagi endpointlar orqali botdagi HAQIQIY
-#  MongoDB balansini o'qiydi/yozadi, shunda bot va webapp balansi
-#  har doim bir xil bo'ladi)
-# ═══════════════════════════════════════════════════════
-def verify_webapp_init_data(init_data: str, max_age_sec: int = 86400):
-    """Telegram tomonidan yuborilgan initData satrini bot tokeni bilan
-    HMAC-SHA256 orqali tekshiradi. Muvaffaqiyatli bo'lsa foydalanuvchi
-    dict'ini qaytaradi, aks holda None."""
-    if not init_data:
-        return None
-    try:
-        parsed = dict(parse_qsl(init_data, strict_parsing=True))
-    except Exception:
-        return None
-    recv_hash = parsed.pop("hash", None)
-    if not recv_hash:
-        return None
-    data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
-    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
-    calc_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(calc_hash, recv_hash):
-        return None
-    try:
-        auth_date = int(parsed.get("auth_date", 0))
-    except ValueError:
-        return None
-    if max_age_sec and (datetime.now().timestamp() - auth_date) > max_age_sec:
-        return None
-    user_json = parsed.get("user")
-    if not user_json:
-        return None
-    try:
-        return json.loads(user_json)
-    except Exception:
-        return None
-
-
-async def webapp_place_bet(uid: int, amt: int):
-    """Stavkani ATOMIK ravishda yechadi: faqat balans yetarli bo'lsagina
-    kamaytiradi (poyga holati/manfiy balansning oldini oladi)."""
-    if amt <= 0:
-        return None
-    res = await users.find_one_and_update(
-        {"user_id": uid, "balance": {"$gte": amt}},
-        {"$inc": {"balance": -amt}},
-        return_document=True,
-    )
-    return res["balance"] if res else None
-
-
-async def webapp_credit_win(uid: int, amt: int):
-    """Yutuqni balansga qo'shadi va yangi balansni qaytaradi."""
-    if amt <= 0:
-        u = await get_user(uid)
-        return u["balance"] if u else None
-    res = await users.find_one_and_update(
-        {"user_id": uid},
-        {"$inc": {"balance": amt}},
-        return_document=True,
-    )
-    return res["balance"] if res else None
 
 async def users_count():
     return await users.count_documents({})
@@ -5975,70 +5908,6 @@ async def on_startup_polling():
     logging.info("✅ Bot polling rejimida ishga tushdi")
 
 
-def _auth_uid_from_request_initdata(init_data: str):
-    user = verify_webapp_init_data(init_data)
-    if not user or "id" not in user:
-        return None
-    return int(user["id"])
-
-
-async def webapp_api_me(request: web.Request):
-    init_data = request.query.get("initData", "")
-    uid = _auth_uid_from_request_initdata(init_data)
-    if uid is None:
-        return web.json_response({"error": "unauthorized"}, status=401)
-    u = await get_user(uid)
-    if not u:
-        return web.json_response({"error": "not_found"}, status=404)
-    ref_count = await get_ref_count(uid)
-    return web.json_response({
-        "balance": u.get("balance", 0),
-        "total_deposited": u.get("total_deposited", 0),
-        "joined": u.get("joined", ""),
-        "ref_count": ref_count,
-    })
-
-
-async def webapp_api_bet(request: web.Request):
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"error": "bad_request"}, status=400)
-    uid = _auth_uid_from_request_initdata(body.get("initData", ""))
-    if uid is None:
-        return web.json_response({"error": "unauthorized"}, status=401)
-    try:
-        amt = int(body.get("amount", 0))
-    except (TypeError, ValueError):
-        return web.json_response({"error": "bad_amount"}, status=400)
-    if amt < 1000 or amt > 200000:
-        return web.json_response({"error": "bad_amount"}, status=400)
-    new_balance = await webapp_place_bet(uid, amt)
-    if new_balance is None:
-        return web.json_response({"error": "insufficient_balance"}, status=400)
-    return web.json_response({"ok": True, "balance": new_balance})
-
-
-async def webapp_api_win(request: web.Request):
-    try:
-        body = await request.json()
-    except Exception:
-        return web.json_response({"error": "bad_request"}, status=400)
-    uid = _auth_uid_from_request_initdata(body.get("initData", ""))
-    if uid is None:
-        return web.json_response({"error": "unauthorized"}, status=401)
-    try:
-        amt = int(body.get("amount", 0))
-    except (TypeError, ValueError):
-        return web.json_response({"error": "bad_amount"}, status=400)
-    if amt < 0:
-        return web.json_response({"error": "bad_amount"}, status=400)
-    new_balance = await webapp_credit_win(uid, amt)
-    if new_balance is None:
-        return web.json_response({"error": "not_found"}, status=404)
-    return web.json_response({"ok": True, "balance": new_balance})
-
-
 async def _run_health_server():
     """Render 'Web Service' turi uchun port ochib turadigan yengil server.
     Agar 'Background Worker' bo'lsa ham, bu server zarar keltirmaydi."""
@@ -6048,14 +5917,6 @@ async def _run_health_server():
         return web.Response(text="OK - bot ishlayapti (polling)")
 
     app.router.add_get("/", health)
-
-    # 💰 Webapp <-> Bot balans sinxronizatsiyasi uchun API
-    # (bular /webapp/ static route'idan OLDIN ro'yxatdan o'tishi SHART,
-    #  aks holda static handler /webapp/api/* so'rovlarini ham ushlab qoladi)
-    app.router.add_get("/webapp/api/me", webapp_api_me)
-    app.router.add_post("/webapp/api/bet", webapp_api_bet)
-    app.router.add_post("/webapp/api/win", webapp_api_win)
-
     # 🏆 Yutuqli o'yin uchun Web App fayllarini xizmat qilish (webapp/index.html)
     webapp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
     if os.path.isdir(webapp_dir):
