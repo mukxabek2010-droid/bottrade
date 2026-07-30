@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Yutuqli o'yin</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(160deg, #1b1035 0%, #2c0f4a 45%, #120722 100%);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 40px;
+  }
+  #hello {
+    font-size: 22px;
+    font-weight: 700;
+    margin-top: 8px;
+    margin-bottom: 4px;
+    text-align: center;
+  }
+  #sub {
+    opacity: .75;
+    font-size: 14px;
+    margin-bottom: 28px;
+    text-align: center;
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 20px;
+    padding: 22px;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .card h2 {
+    margin: 0 0 6px;
+    font-size: 18px;
+  }
+  .card p {
+    margin: 0 0 18px;
+    font-size: 13px;
+    opacity: .8;
+    line-height: 1.5;
+  }
+  #wheel-wrap {
+    position: relative;
+    width: 260px;
+    height: 260px;
+    margin: 0 auto 20px;
+  }
+  #wheel {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(
+      #ff5e5e 0deg 60deg,
+      #ffd15e 60deg 120deg,
+      #5ef0ff 120deg 180deg,
+      #7dff7d 180deg 240deg,
+      #c26bff 240deg 300deg,
+      #ff9de1 300deg 360deg
+    );
+    border: 6px solid rgba(255,255,255,0.25);
+    transition: transform 4s cubic-bezier(.17,.67,.21,1);
+    position: relative;
+  }
+  #wheel span {
+    position: absolute;
+    left: 50%;
+    top: 14px;
+    transform-origin: 0 116px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #1b1035;
+    width: 60px;
+    text-align: center;
+    margin-left: -30px;
+  }
+  #pointer {
+    position: absolute;
+    top: -4px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0; height: 0;
+    border-left: 12px solid transparent;
+    border-right: 12px solid transparent;
+    border-top: 20px solid #fff;
+    z-index: 2;
+    filter: drop-shadow(0 2px 3px rgba(0,0,0,.4));
+  }
+  #spinBtn {
+    display: block;
+    width: 100%;
+    padding: 14px;
+    border: none;
+    border-radius: 14px;
+    font-size: 16px;
+    font-weight: 700;
+    color: #1b1035;
+    background: linear-gradient(135deg, #ffe15e, #ff9de1);
+    cursor: pointer;
+  }
+  #spinBtn:disabled {
+    opacity: .5;
+  }
+  #result {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 15px;
+    min-height: 22px;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+  <div id="hello">Salom! 👋</div>
+  <div id="sub">Yutuqli o'yinga xush kelibsiz</div>
+
+  <div class="card">
+    <h2>🏆 Yutuqli o'yin</h2>
+    <p>Aylantirgichni bosing va omadingizni sinab ko'ring!</p>
+
+    <div id="wheel-wrap">
+      <div id="pointer"></div>
+      <div id="wheel">
+        <span style="transform: rotate(30deg) translateY(-116px);">10 🎁</span>
+        <span style="transform: rotate(90deg) translateY(-116px);">50 🎁</span>
+        <span style="transform: rotate(150deg) translateY(-116px);">0</span>
+        <span style="transform: rotate(210deg) translateY(-116px);">100 🎁</span>
+        <span style="transform: rotate(270deg) translateY(-116px);">20 🎁</span>
+        <span style="transform: rotate(330deg) translateY(-116px);">5 🎁</span>
+      </div>
+    </div>
+
+    <button id="spinBtn">🎯 Aylantirish</button>
+    <div id="result"></div>
+  </div>
+
+<script>
+  const tg = window.Telegram ? window.Telegram.WebApp : null;
+  if (tg) {
+    tg.ready();
+    tg.expand();
+  }
+
+  // Foydalanuvchi ismini Telegramdan olish (agar mavjud bo'lsa)
+  const user = tg && tg.initDataUnsafe && tg.initDataUnsafe.user;
+  if (user && user.first_name) {
+    document.getElementById('hello').textContent = 'Salom, ' + user.first_name + '! 👋';
+  }
+
+  const prizes = [10, 50, 0, 100, 20, 5];
+  const wheel = document.getElementById('wheel');
+  const btn = document.getElementById('spinBtn');
+  const result = document.getElementById('result');
+  let spinning = false;
+  let currentRotation = 0;
+
+  btn.addEventListener('click', () => {
+    if (spinning) return;
+    spinning = true;
+    btn.disabled = true;
+    result.textContent = '';
+
+    const sliceIndex = Math.floor(Math.random() * prizes.length);
+    const sliceAngle = 360 / prizes.length;
+    const targetAngle = 360 * 5 + (360 - (sliceIndex * sliceAngle + sliceAngle / 2));
+    currentRotation += targetAngle;
+    wheel.style.transform = `rotate(${currentRotation}deg)`;
+
+    setTimeout(() => {
+      const prize = prizes[sliceIndex];
+      if (prize > 0) {
+        result.textContent = '🎉 Tabriklaymiz! Siz ' + prize + ' bonus yutdingiz!';
+      } else {
+        result.textContent = '😔 Afsuski, bu safar omad kulib boqmadi. Qayta urinib ko‘ring!';
+      }
+      spinning = false;
+      btn.disabled = false;
+    }, 4100);
+  });
+</script>
+</body>
+</html>
