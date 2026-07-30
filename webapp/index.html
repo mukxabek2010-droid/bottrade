@@ -46,7 +46,7 @@
     display:flex; flex-direction:column; gap:12px;
   }
 
-  /* HEADER */
+  /* ── HEADER (PROFIL + BALANS INTEGRATSIYA) ── */
   .header{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
     background:rgba(20, 15, 45, 0.7); border:1px solid var(--card-line);
@@ -76,14 +76,14 @@
     font-size:16px; font-weight:800; display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
 
-  /* PANELS */
+  /* ── PANELS ── */
   .panel{display:none; flex-direction:column; gap:12px; animation:fadein .2s ease;}
   .panel.active{display:flex;}
   @keyframes fadein{from{opacity:0; transform:translateY(4px);} to{opacity:1; transform:translateY(0);}}
 
   .card{background:var(--card); border:1px solid var(--card-line); border-radius:20px; padding:14px;}
 
-  /* CRASH STAGE */
+  /* 🚀 CRASH PRO SECTION */
   .crash-card{display:flex; flex-direction:column; gap:12px; position:relative;}
   
   .canvas-stage{
@@ -191,7 +191,7 @@
 
   <div class="wrap">
 
-    <!-- HEADER -->
+    <!-- ── INTEGRATED HEADER (PROFIL + REAL BALANS) ── -->
     <div class="header">
       <div class="user-block">
         <div class="avatar-ring">
@@ -204,6 +204,7 @@
         </div>
       </div>
 
+      <!-- Real Balans -->
       <div class="header-balance" id="topupBtn">
         <div class="bal-info">
           <span class="bal-label">Balans</span>
@@ -213,7 +214,7 @@
       </div>
     </div>
 
-    <!-- 1) CRASH GAME -->
+    <!-- ══════════ 1) CRASH PRO (MAIN GAME) ══════════ -->
     <div class="panel active" id="panel-crash">
       <div class="card crash-card">
         <button class="sound-toggle" id="soundToggle">🔊 Ovoz ON</button>
@@ -252,7 +253,7 @@
       </div>
     </div>
 
-    <!-- 2) MENYU -->
+    <!-- ══════════ 2) MENYU ══════════ -->
     <div class="panel" id="panel-menu">
       <div class="menu-grid">
         <div class="menu-item" data-action="open_deposit"><div class="ico">💰</div><div class="lab">Hisob to'ldirish</div></div>
@@ -262,7 +263,7 @@
       </div>
     </div>
 
-    <!-- 3) PROFIL -->
+    <!-- ══════════ 3) PROFIL ══════════ -->
     <div class="panel" id="panel-profile">
       <div class="card profile-hero">
         <div class="avatar-ring">
@@ -283,7 +284,7 @@
 
   </div>
 
-  <!-- NAVBAR -->
+  <!-- ── NAVBAR ── -->
   <div class="navbar">
     <div class="navbar-inner">
       <button class="nav-btn active" data-tab="crash"><span class="ico">🚀</span><span class="lab">Crash</span></button>
@@ -302,6 +303,7 @@
   function fmt(n){ try { return Math.round(Number(n)).toLocaleString('ru-RU'); } catch(e){ return n; } }
   function initials(str){ if(!str) return '?'; return str.trim().split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase(); }
 
+  // ══════════ REAL BALANS VA PROFIL INTEGRATSIYASI ══════════
   let currentBalance = 0;
   const tgUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
 
@@ -335,7 +337,7 @@
     document.getElementById('pStatBalance').textContent = fmt(currentBalance) + " so'm";
   }
 
-  // 1. SERVERDAN BALANS OLISH
+  // BOT API DANT REAL BALANS VA MA'LUMOTLARNI OLISH
   async function loadMe(){
     if (!tg || !tg.initData) return;
     try {
@@ -354,30 +356,7 @@
   }
   loadMe();
 
-  // 2. BALANS O'ZGARISHLARINI SERVERGA SAQLASH (STAVKA & CASHOUT)
-  async function syncBalanceWithServer(actionType, amount, multiplier = 1) {
-    if (!tg || !tg.initData) return;
-    try {
-      const res = await fetch('/webapp/api/game-result', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          initData: tg.initData,
-          action: actionType, // 'bet' yoki 'win'
-          amount: amount,
-          multiplier: multiplier
-        })
-      });
-      const data = await res.json();
-      if (data.ok && data.newBalance !== undefined) {
-        currentBalance = data.newBalance;
-        updateBalanceUI();
-      }
-    } catch(e) {
-      console.error("Server bilan sinxronizatsiyada xatolik:", e);
-    }
-  }
-
+  // Depozit ochish Action
   document.getElementById('topupBtn').addEventListener('click', function(){
     if (!tg) return;
     haptic('light');
@@ -385,7 +364,7 @@
     tg.close();
   });
 
-  // SOUND FX ENGINE
+  // ══════════ SOUND FX ENGINE ══════════
   let soundEnabled = true;
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -442,7 +421,7 @@
     if (audioCtx.state === 'suspended') audioCtx.resume();
   });
 
-  // TAB NAVIGATION
+  // ══════════ TAB NAVIGATION ══════════
   document.querySelectorAll('.nav-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       haptic('light');
@@ -462,7 +441,7 @@
     });
   });
 
-  // BOT SIMULATION
+  // ══════════ FEYK BOTLAR TIZIMI ══════════
   const BOT_NAMES = ['Sardor', 'Jasur', 'Madina', 'CryptoKing', 'Bekzod', 'Aziz_77', 'Ali_Pro', 'SHOH', 'Diyorbek', 'Timur', 'Lola', 'Rustam'];
   let currentBots = [];
 
@@ -527,7 +506,7 @@
     });
   }
 
-  // CANVAS ENGINE & CRASH LOOP
+  // ══════════ CANVAS ENGINE & CRASH LOOP ══════════
   const canvas = document.getElementById('crashCanvas');
   const ctx = canvas.getContext('2d');
   let canvasW, canvasH;
@@ -564,11 +543,47 @@
     });
   });
 
-  // ACTION BUTTON LOGIC (WITH REAL-TIME BACKEND SYNC)
+  // Bot serveridagi HAQIQIY balansga stavka yozish (MongoDB'dagi balance
+  // shu yerda kamayadi, shuning uchun bot va webapp doim sinxron bo'ladi)
+  async function serverPlaceBet(amt){
+    if (!tg || !tg.initData) return null;
+    try {
+      const res = await fetch('/webapp/api/bet', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: tg.initData, amount: amt })
+      });
+      const d = await res.json();
+      if (!res.ok) return { error: d.error || 'error' };
+      return { balance: d.balance };
+    } catch(e) {
+      return { error: 'network' };
+    }
+  }
+
+  // Yutuqni bot serverida balansga qo'shish
+  async function serverCreditWin(amt){
+    if (!tg || !tg.initData) return null;
+    try {
+      const res = await fetch('/webapp/api/win', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: tg.initData, amount: amt })
+      });
+      const d = await res.json();
+      if (!res.ok) return { error: d.error || 'error' };
+      return { balance: d.balance };
+    } catch(e) {
+      return { error: 'network' };
+    }
+  }
+
+  let betInFlight = false;
+
   actionBtn.addEventListener('click', async () => {
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    if (betInFlight) return;
 
-    // STAVKA TIKISH
     if (gameState === 'WAITING' && !myBetState.placed) {
       const amt = parseInt(betInput.value, 10);
       if (isNaN(amt) || amt < 1000 || amt > 200000) {
@@ -579,28 +594,36 @@
         alert("Balans yetarli emas!");
         return;
       }
-
-      currentBalance -= amt;
+      betInFlight = true;
+      const result = await serverPlaceBet(amt);
+      betInFlight = false;
+      if (!result || result.error) {
+        alert(result && result.error === 'insufficient_balance' ? "Balans yetarli emas!" : "Xatolik yuz berdi, qayta urinib ko'ring.");
+        return;
+      }
+      currentBalance = result.balance;
       updateBalanceUI();
       myBetState = { placed: true, amount: amt, cashedOut: false, winAmt: 0, lost: false };
-      
       actionBtn.textContent = "Kutilmoqda...";
       actionBtn.className = "big-btn disabled";
       haptic('medium');
       renderBotsTable();
-
-      // Serverdan ham balansni yechish
-      await syncBalanceWithServer('bet', amt);
     } 
-    // CASHOUT (PULNI YECHISH)
     else if (gameState === 'RUNNING' && myBetState.placed && !myBetState.cashedOut) {
       myBetState.cashedOut = true;
-      const winAmount = Math.round(myBetState.amount * currentMult);
-      myBetState.winAmt = winAmount;
+      myBetState.winAmt = Math.round(myBetState.amount * currentMult);
 
-      currentBalance += winAmount;
+      betInFlight = true;
+      const result = await serverCreditWin(myBetState.winAmt);
+      betInFlight = false;
+      if (result && !result.error) {
+        currentBalance = result.balance;
+      } else {
+        // Server bilan bog'lanib bo'lmadi — real balansni qayta yuklaymiz
+        await loadMe();
+      }
       updateBalanceUI();
-      
+
       playWinSound();
       haptic('heavy');
       notify('success');
@@ -609,9 +632,6 @@
       actionBtn.className = "big-btn disabled";
       multEl.className = "crash-mult-val won";
       renderBotsTable();
-
-      // Serverga yutuqni yozib qo'yish
-      await syncBalanceWithServer('win', winAmount, currentMult);
     }
   });
 
