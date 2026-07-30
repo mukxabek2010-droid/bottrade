@@ -1,3 +1,4 @@
+cat > /home/claude/project/webapp/index.html << 'HTMLEOF'
 <!DOCTYPE html>
 <html lang="uz">
 <head>
@@ -19,8 +20,11 @@
     --ink-dim:rgba(244,242,255,.62);
     --card:rgba(255,255,255,.06);
     --card-line:rgba(255,255,255,.10);
+    --green:#3ddc84;
+    --red:#ff5c5c;
     --safe-top: env(safe-area-inset-top, 0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --navh: 68px;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -35,10 +39,7 @@
     background-attachment:fixed;
     overflow-x:hidden;
   }
-  /* Orqa fonda suzib yuruvchi yumshoq shakllar */
-  .aura{
-    position:fixed; border-radius:50%; filter:blur(60px); opacity:.35; z-index:0; pointer-events:none;
-  }
+  .aura{position:fixed; border-radius:50%; filter:blur(60px); opacity:.35; z-index:0; pointer-events:none;}
   .aura.a1{width:260px;height:260px; background:var(--violet); top:-60px; right:-60px; animation:float1 12s ease-in-out infinite;}
   .aura.a2{width:220px;height:220px; background:var(--gold); bottom:10%; left:-70px; animation:float2 14s ease-in-out infinite;}
   @keyframes float1{0%,100%{transform:translate(0,0)}50%{transform:translate(-18px,22px)}}
@@ -47,156 +48,141 @@
   .wrap{
     position:relative; z-index:1;
     max-width:480px; margin:0 auto;
-    padding: calc(16px + var(--safe-top)) 16px calc(28px + var(--safe-bottom));
+    padding: calc(14px + var(--safe-top)) 14px calc(var(--navh) + 20px + var(--safe-bottom));
     min-height:100vh;
-    display:flex; flex-direction:column; gap:16px;
+    display:flex; flex-direction:column; gap:14px;
   }
 
-  /* ── HEADER: avatar + ism + id ── */
+  /* ── HEADER ── */
   .header{
     display:flex; align-items:center; gap:12px;
-    background:var(--card);
-    border:1px solid var(--card-line);
-    backdrop-filter:blur(14px);
-    -webkit-backdrop-filter:blur(14px);
-    border-radius:20px;
-    padding:12px 14px;
+    background:var(--card); border:1px solid var(--card-line);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    border-radius:20px; padding:12px 14px;
   }
-  .avatar-ring{
-    width:52px;height:52px; border-radius:50%;
-    padding:2px;
-    background:linear-gradient(135deg,var(--gold),var(--violet));
-    flex-shrink:0;
-  }
-  .avatar{
-    width:100%;height:100%;border-radius:50%;
-    display:flex;align-items:center;justify-content:center;
-    background:var(--bg-mid); color:var(--gold);
-    font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px;
-    object-fit:cover;
-  }
+  .avatar-ring{width:48px;height:48px; border-radius:50%; padding:2px;
+    background:linear-gradient(135deg,var(--gold),var(--violet)); flex-shrink:0;}
+  .avatar{width:100%;height:100%;border-radius:50%; display:flex;align-items:center;justify-content:center;
+    background:var(--bg-mid); color:var(--gold); font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px;
+    object-fit:cover;}
   .who{min-width:0; flex:1;}
-  .who .name{
-    font-weight:800; font-size:15.5px; line-height:1.25;
-    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-  }
-  .who .idrow{
-    display:flex; align-items:center; gap:6px; margin-top:3px;
-  }
-  .who .idbadge{
-    font-family:'Space Grotesk',monospace; font-size:11.5px;
-    color:var(--ink-dim);
-    background:rgba(255,255,255,.06);
-    border:1px solid var(--card-line);
-    padding:2px 8px; border-radius:20px;
-  }
-  .who .uname{ font-size:12px; color:var(--ink-dim); }
-  .trophy{
-    font-size:22px; margin-left:auto; flex-shrink:0;
-    filter:drop-shadow(0 0 10px rgba(255,201,60,.55));
-  }
+  .who .name{font-weight:800; font-size:14.5px; line-height:1.25; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .who .idrow{display:flex; align-items:center; gap:6px; margin-top:3px;}
+  .who .idbadge{font-family:'Space Grotesk',monospace; font-size:11px; color:var(--ink-dim);
+    background:rgba(255,255,255,.06); border:1px solid var(--card-line); padding:2px 8px; border-radius:20px;}
+  .who .uname{font-size:11.5px; color:var(--ink-dim);}
+  .trophy{font-size:20px; margin-left:auto; flex-shrink:0; filter:drop-shadow(0 0 10px rgba(255,201,60,.55));}
 
-  /* ── BALANS ── */
-  .balance-card{
-    position:relative; overflow:hidden;
-    border-radius:22px; padding:18px 18px;
+  /* ── PANELS ── */
+  .panel{display:none; flex-direction:column; gap:14px; animation:fadein .25s ease;}
+  .panel.active{display:flex;}
+  @keyframes fadein{from{opacity:0; transform:translateY(6px);} to{opacity:1; transform:translateY(0);}}
+
+  .card{background:var(--card); border:1px solid var(--card-line); border-radius:20px; padding:18px;}
+  .section-title{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; margin:2px 2px 0; display:flex; align-items:center; gap:8px;}
+
+  /* balans */
+  .balance-card{position:relative; overflow:hidden; border-radius:22px; padding:18px;
     background:linear-gradient(135deg, rgba(124,92,255,.35), rgba(255,201,60,.18)), var(--card);
-    border:1px solid rgba(255,201,60,.35);
-  }
-  .balance-card::after{
-    content:""; position:absolute; inset:0;
-    background:radial-gradient(220px 120px at 90% -20%, rgba(255,255,255,.18), transparent 60%);
-    pointer-events:none;
-  }
-  .balance-label{
-    font-size:12.5px; color:var(--ink-dim); letter-spacing:.03em;
-    display:flex; align-items:center; gap:6px;
-  }
-  .balance-row{
-    display:flex; align-items:center; gap:12px; margin-top:6px;
-  }
-  .balance-amount{
-    font-family:'Space Grotesk',sans-serif; font-weight:700;
-    font-size:clamp(24px, 7vw, 30px);
-    letter-spacing:.01em;
-    cursor:pointer; user-select:none;
-    display:flex; align-items:baseline; gap:6px;
-    flex:1; min-width:0;
-  }
+    border:1px solid rgba(255,201,60,.35);}
+  .balance-card::after{content:""; position:absolute; inset:0;
+    background:radial-gradient(220px 120px at 90% -20%, rgba(255,255,255,.18), transparent 60%); pointer-events:none;}
+  .balance-label{font-size:12.5px; color:var(--ink-dim); display:flex; align-items:center; gap:6px;}
+  .balance-row{display:flex; align-items:center; gap:12px; margin-top:6px;}
+  .balance-amount{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(24px, 7vw, 30px);
+    cursor:pointer; user-select:none; display:flex; align-items:baseline; gap:6px; flex:1; min-width:0;}
   .balance-amount .unit{font-size:13px; font-weight:500; color:var(--ink-dim);}
-  .plus-btn{
-    flex-shrink:0;
-    width:44px;height:44px; border-radius:50%; border:none;
-    background:linear-gradient(135deg,var(--gold),var(--gold-2));
-    color:#231400; font-size:22px; font-weight:800;
-    display:flex; align-items:center; justify-content:center;
-    cursor:pointer;
-    box-shadow:0 6px 18px rgba(255,157,60,.35);
-    transition:transform .15s ease;
-    animation:pulse 2.4s ease-in-out infinite;
-  }
+  .plus-btn{flex-shrink:0; width:44px;height:44px; border-radius:50%; border:none;
+    background:linear-gradient(135deg,var(--gold),var(--gold-2)); color:#231400; font-size:22px; font-weight:800;
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+    box-shadow:0 6px 18px rgba(255,157,60,.35); transition:transform .15s ease; animation:pulse 2.4s ease-in-out infinite;}
   .plus-btn:active{transform:scale(.92);}
-  @keyframes pulse{
-    0%,100%{box-shadow:0 6px 18px rgba(255,157,60,.35);}
-    50%{box-shadow:0 6px 26px rgba(255,157,60,.6);}
-  }
+  @keyframes pulse{0%,100%{box-shadow:0 6px 18px rgba(255,157,60,.35);}50%{box-shadow:0 6px 26px rgba(255,157,60,.6);}}
   .balance-hint{margin-top:8px; font-size:11.5px; color:var(--ink-dim);}
 
-  /* ── O'YIN QISMI ── */
-  .section-title{
-    font-family:'Space Grotesk',sans-serif; font-weight:700;
-    font-size:15px; margin: 6px 2px 0; display:flex; align-items:center; gap:8px;
-  }
-  .game-card{
-    background:var(--card); border:1px solid var(--card-line);
-    border-radius:22px; padding:22px 16px 20px;
-    display:flex; flex-direction:column; align-items:center; gap:16px;
-  }
-  .wheel-wrap{ position:relative; width:min(78vw, 260px); aspect-ratio:1/1; }
-  .wheel-pointer{
-    position:absolute; top:-6px; left:50%; transform:translateX(-50%);
-    width:0;height:0; z-index:2;
-    border-left:11px solid transparent; border-right:11px solid transparent;
-    border-top:18px solid var(--gold);
-    filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));
-  }
-  .wheel{
-    width:100%; height:100%; border-radius:50%;
-    border:4px solid rgba(255,201,60,.55);
-    transform:rotate(0deg);
-    transition:transform 4.2s cubic-bezier(.17,.9,.15,1);
-    box-shadow:0 0 0 6px rgba(124,92,255,.12), inset 0 0 30px rgba(0,0,0,.35);
-  }
+  .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .stat-box{background:rgba(255,255,255,.05); border:1px solid var(--card-line); border-radius:14px; padding:12px;}
+  .stat-box .lab{font-size:11px; color:var(--ink-dim);}
+  .stat-box .val{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:16px; margin-top:3px;}
+
+  /* bonus */
+  .wheel-wrap{position:relative; width:min(70vw, 230px); aspect-ratio:1/1; margin:4px auto 0;}
+  .wheel-pointer{position:absolute; top:-6px; left:50%; transform:translateX(-50%); width:0;height:0; z-index:2;
+    border-left:10px solid transparent; border-right:10px solid transparent; border-top:16px solid var(--gold);
+    filter:drop-shadow(0 2px 4px rgba(0,0,0,.4));}
+  .wheel{width:100%; height:100%; border-radius:50%; border:4px solid rgba(255,201,60,.55);
+    transform:rotate(0deg); transition:transform 3.4s cubic-bezier(.17,.9,.15,1);
+    box-shadow:0 0 0 6px rgba(124,92,255,.12), inset 0 0 30px rgba(0,0,0,.35);}
   .wheel svg{width:100%;height:100%;display:block;border-radius:50%;}
-  .hub{
-    position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
-    width:20%; height:20%; border-radius:50%;
+  .hub{position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:20%; height:20%; border-radius:50%;
     background:radial-gradient(circle at 35% 30%, #fff2c7, var(--gold) 60%, var(--gold-2));
-    box-shadow:0 0 12px rgba(255,201,60,.7); z-index:2;
-  }
-  .spin-btn{
-    width:100%; padding:14px; border:none; border-radius:16px;
-    background:linear-gradient(135deg,var(--violet),var(--violet-2));
-    color:#fff; font-weight:800; font-size:15px; letter-spacing:.02em;
-    cursor:pointer; box-shadow:0 8px 22px rgba(91,61,240,.4);
-    transition:transform .12s ease, opacity .2s ease;
-  }
-  .spin-btn:active{transform:scale(.98);}
-  .spin-btn:disabled{opacity:.45; cursor:not-allowed;}
-  .result{
-    min-height:20px; font-size:13.5px; color:var(--ink-dim); text-align:center;
-  }
+    box-shadow:0 0 12px rgba(255,201,60,.7); z-index:2;}
+  .big-btn{width:100%; padding:14px; border:none; border-radius:16px;
+    background:linear-gradient(135deg,var(--violet),var(--violet-2)); color:#fff; font-weight:800; font-size:15px;
+    letter-spacing:.02em; cursor:pointer; box-shadow:0 8px 22px rgba(91,61,240,.4);
+    transition:transform .12s ease, opacity .2s ease;}
+  .big-btn:active{transform:scale(.98);}
+  .big-btn:disabled{opacity:.45; cursor:not-allowed;}
+  .big-btn.gold{background:linear-gradient(135deg,var(--gold),var(--gold-2)); color:#231400; box-shadow:0 8px 22px rgba(255,157,60,.35);}
+  .result{min-height:20px; font-size:13.5px; color:var(--ink-dim); text-align:center;}
   .result b{color:var(--gold);}
 
-  .foot-note{
-    text-align:center; font-size:11px; color:rgba(244,242,255,.4);
-    margin-top:auto; padding-top:6px;
-  }
+  /* menyu */
+  .menu-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  .menu-item{background:rgba(255,255,255,.05); border:1px solid var(--card-line); border-radius:16px;
+    padding:14px 10px; display:flex; flex-direction:column; align-items:center; gap:6px; text-align:center;
+    cursor:pointer; transition:transform .12s ease, background .15s ease;}
+  .menu-item:active{transform:scale(.95); background:rgba(255,255,255,.1);}
+  .menu-item .ico{font-size:24px;}
+  .menu-item .lab{font-size:12px; font-weight:700;}
+
+  /* crash */
+  .crash-stage{position:relative; height:180px; border-radius:18px; overflow:hidden;
+    background:linear-gradient(180deg, rgba(124,92,255,.15), rgba(0,0,0,.25));
+    border:1px solid var(--card-line); display:flex; align-items:center; justify-content:center;}
+  .crash-mult{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:clamp(36px,12vw,52px); transition:color .2s ease;}
+  .crash-mult.running{color:var(--gold);}
+  .crash-mult.crashed{color:var(--red);}
+  .crash-mult.won{color:var(--green);}
+  .crash-rocket{position:absolute; font-size:26px; transition:transform .1s linear;}
+  .bet-row{display:flex; gap:8px; align-items:center;}
+  .bet-input{flex:1; background:rgba(255,255,255,.06); border:1px solid var(--card-line); border-radius:12px;
+    padding:12px; color:var(--ink); font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px;}
+  .bet-input:focus{outline:none; border-color:var(--gold);}
+  .chip-row{display:flex; gap:8px; flex-wrap:wrap;}
+  .chip{background:rgba(255,255,255,.07); border:1px solid var(--card-line); border-radius:20px; padding:6px 12px;
+    font-size:12px; font-weight:700; cursor:pointer; color:var(--ink-dim);}
+  .chip:active{background:rgba(255,255,255,.15);}
+  .history-row{display:flex; gap:6px; flex-wrap:wrap;}
+  .history-chip{font-size:11px; font-weight:700; padding:4px 8px; border-radius:10px;}
+  .history-chip.win{background:rgba(61,220,132,.15); color:var(--green);}
+  .history-chip.lose{background:rgba(255,92,92,.15); color:var(--red);}
+
+  /* profil */
+  .profile-hero{display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding-top:6px;}
+  .profile-hero .avatar-ring{width:76px;height:76px;}
+  .profile-hero .avatar{font-size:26px;}
+  .profile-hero .pname{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:19px;}
+  .profile-hero .puname{font-size:12.5px; color:var(--ink-dim);}
+
+  /* bottom nav */
+  .navbar{position:fixed; left:0; right:0; bottom:0; z-index:20;
+    padding-bottom:var(--safe-bottom);
+    background:rgba(12,10,26,.85); backdrop-filter:blur(18px); -webkit-backdrop-filter:blur(18px);
+    border-top:1px solid var(--card-line);}
+  .navbar-inner{max-width:480px; margin:0 auto; height:var(--navh); display:flex;}
+  .nav-btn{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px;
+    background:none; border:none; color:var(--ink-dim); font-family:'Manrope',sans-serif; cursor:pointer;
+    position:relative; padding:6px 2px;}
+  .nav-btn .ico{font-size:21px; transition:transform .15s ease;}
+  .nav-btn .lab{font-size:10px; font-weight:700;}
+  .nav-btn.active{color:var(--gold);}
+  .nav-btn.active .ico{transform:translateY(-2px);}
+  .nav-btn.active::after{content:""; position:absolute; top:2px; left:50%; transform:translateX(-50%);
+    width:5px; height:5px; border-radius:50%; background:var(--gold);}
 
   @media (min-width:700px){
-    .wrap{padding-top:40px;}
-    .header{padding:16px 18px;}
-    .balance-card{padding:24px;}
+    .wrap{padding-top:36px;}
   }
 </style>
 </head>
@@ -205,12 +191,8 @@
   <div class="aura a2"></div>
 
   <div class="wrap">
-    <div style="background:#3a0d0d;color:#ffd4d4;font-family:monospace;font-size:12px;padding:6px 10px;border-radius:10px;margin-bottom:4px;text-align:center;">
-      FILE VERSION: v5-inline-webapp-fix
-    </div>
-    <div id="debugLine" style="position:sticky; top:0; z-index:10; background:#3a0d0d; color:#ffd4d4; font-size:11px; font-family:monospace; padding:6px 10px; border-radius:10px; margin-bottom:4px; word-break:break-all;"></div>
 
-    <!-- ── FOYDALANUVCHI HEADER: rasm, ism, ID ── -->
+    <!-- ── HEADER: rasm, ism, ID ── -->
     <div class="header">
       <div class="avatar-ring">
         <img class="avatar" id="avatarImg" alt="" style="display:none;">
@@ -226,34 +208,111 @@
       <div class="trophy">🏆</div>
     </div>
 
-    <!-- ── BALANS (botdagi profil balansi bilan bir xil) ── -->
-    <div class="balance-card">
-      <div class="balance-label">💰 Balansingiz</div>
-      <div class="balance-row">
-        <div class="balance-amount" id="balanceBtn">
-          <span id="balanceValue">—</span>
-          <span class="unit">so'm</span>
+    <!-- ══════════ 1) BALANS ══════════ -->
+    <div class="panel active" id="panel-balance">
+      <div class="balance-card">
+        <div class="balance-label">💰 Balansingiz</div>
+        <div class="balance-row">
+          <div class="balance-amount" id="balanceBtn">
+            <span id="balanceValue">—</span>
+            <span class="unit">so'm</span>
+          </div>
+          <button class="plus-btn" id="plusBtn" aria-label="Hisobni to'ldirish">+</button>
         </div>
-        <button class="plus-btn" id="plusBtn" aria-label="Hisobni to'ldirish">+</button>
+        <div class="balance-hint">Balansga bosing yoki + tugmasini bosing — hisobni to'ldirish botda ochiladi</div>
       </div>
-      <div class="balance-hint">Balansga bosing yoki + tugmasini bosing — hisobni to'ldirish botda ochiladi</div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="lab">📈 Jami kiritilgan</div><div class="val" id="statDeposited">—</div></div>
+        <div class="stat-box"><div class="lab">🎁 Referallar</div><div class="val" id="statRefs">—</div></div>
+      </div>
     </div>
 
-    <!-- ── YUTUQLI O'YIN ── -->
-    <div class="section-title">🎡 Omad g'ildiragi</div>
-    <div class="game-card">
-      <div class="wheel-wrap">
-        <div class="wheel-pointer"></div>
-        <div class="wheel" id="wheel">
-          <svg viewBox="0 0 100 100"></svg>
+    <!-- ══════════ 2) KUNLIK BONUS ══════════ -->
+    <div class="panel" id="panel-bonus">
+      <div class="section-title">🎁 Kunlik bonus</div>
+      <div class="card" style="align-items:center; display:flex; flex-direction:column; gap:14px;">
+        <div class="wheel-wrap">
+          <div class="wheel-pointer"></div>
+          <div class="wheel" id="wheel"><svg viewBox="0 0 100 100"></svg></div>
+          <div class="hub"></div>
         </div>
-        <div class="hub"></div>
+        <button class="big-btn gold" id="bonusBtn">🎰 Bonusni olish</button>
+        <div class="result" id="bonusResult">Har 24 soatda bir marta bonus olishingiz mumkin!</div>
       </div>
-      <button class="spin-btn" id="spinBtn">🎰 Aylantirish</button>
-      <div class="result" id="spinResult">Kuningizga omad tilaymiz!</div>
     </div>
 
-    <div class="foot-note">Roblox Trade &amp; Robux — Yutuqli o'yin</div>
+    <!-- ══════════ 3) MENYU ══════════ -->
+    <div class="panel" id="panel-menu">
+      <div class="section-title">☰ Tezkor menyu</div>
+      <div class="menu-grid">
+        <div class="menu-item" data-action="open_profile"><div class="ico">👤</div><div class="lab">Profil</div></div>
+        <div class="menu-item" data-action="open_deposit"><div class="ico">💰</div><div class="lab">Hisob to'ldirish</div></div>
+        <div class="menu-item" data-action="open_buy"><div class="ico">🛒</div><div class="lab">Robux olish</div></div>
+        <div class="menu-item" data-action="open_trade_menu"><div class="ico">🔄</div><div class="lab">Trade</div></div>
+        <div class="menu-item" data-action="open_sotuv_menu"><div class="ico">🛍</div><div class="lab">Sotuv</div></div>
+        <div class="menu-item" data-action="open_duel_menu"><div class="ico">⚔️</div><div class="lab">Duel</div></div>
+        <div class="menu-item" data-action="open_accounts_menu"><div class="ico">👥</div><div class="lab">Akkauntlar</div></div>
+        <div class="menu-item" data-action="open_pro_menu"><div class="ico">💎</div><div class="lab">Pro</div></div>
+        <div class="menu-item" data-action="open_referral"><div class="ico">🎁</div><div class="lab">Referal</div></div>
+        <div class="menu-item" data-action="open_bloxfruit"><div class="ico">🍈</div><div class="lab">Blox Fruit</div></div>
+      </div>
+    </div>
+
+    <!-- ══════════ 4) CRASH ══════════ -->
+    <div class="panel" id="panel-crash">
+      <div class="section-title">📈 Crash</div>
+      <div class="card" style="display:flex; flex-direction:column; gap:14px;">
+        <div class="crash-stage">
+          <div class="crash-rocket" id="crashRocket" style="display:none;">🚀</div>
+          <div class="crash-mult" id="crashMult">1.00x</div>
+        </div>
+        <div class="bet-row">
+          <input class="bet-input" id="betInput" type="number" inputmode="numeric" placeholder="Stavka (so'm)" value="5000">
+          <button class="big-btn gold" id="crashActionBtn" style="width:auto; padding:12px 18px; white-space:nowrap;">🚀 Boshlash</button>
+        </div>
+        <div class="chip-row">
+          <div class="chip" data-amt="5000">5 000</div>
+          <div class="chip" data-amt="10000">10 000</div>
+          <div class="chip" data-amt="20000">20 000</div>
+          <div class="chip" data-half="1">½</div>
+          <div class="chip" data-double="1">2×</div>
+        </div>
+        <div class="result" id="crashResult">Stavka qo'yib, 🚀 tugmasini bosing. Vaqtida "Yechib olish" bosmasangiz — stavka kuyadi!</div>
+        <div class="history-row" id="crashHistory"></div>
+      </div>
+    </div>
+
+    <!-- ══════════ 5) PROFIL ══════════ -->
+    <div class="panel" id="panel-profile">
+      <div class="card profile-hero">
+        <div class="avatar-ring">
+          <img class="avatar" id="avatarImg2" alt="" style="display:none;">
+          <div class="avatar" id="avatarFallback2">?</div>
+        </div>
+        <div class="pname" id="profileName">—</div>
+        <div class="puname" id="profileUname"></div>
+        <div class="idbadge" id="profileId">ID —</div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="lab">💰 Balans</div><div class="val" id="pStatBalance">—</div></div>
+        <div class="stat-box"><div class="lab">📈 Jami kiritilgan</div><div class="val" id="pStatDeposited">—</div></div>
+        <div class="stat-box"><div class="lab">📅 Ro'yxatdan o'tgan</div><div class="val" id="pStatJoined">—</div></div>
+        <div class="stat-box"><div class="lab">🎁 Referallar</div><div class="val" id="pStatRefs">—</div></div>
+      </div>
+      <button class="big-btn" id="profileMenuBtn">☰ Botdagi profilni ochish</button>
+    </div>
+
+  </div>
+
+  <!-- ── PASTKI NAVIGATSIYA (5 bo'lim) ── -->
+  <div class="navbar">
+    <div class="navbar-inner">
+      <button class="nav-btn active" data-tab="balance"><span class="ico">💰</span><span class="lab">Balans</span></button>
+      <button class="nav-btn" data-tab="bonus"><span class="ico">🎁</span><span class="lab">Bonus</span></button>
+      <button class="nav-btn" data-tab="menu"><span class="ico">☰</span><span class="lab">Menyu</span></button>
+      <button class="nav-btn" data-tab="crash"><span class="ico">📈</span><span class="lab">Crash</span></button>
+      <button class="nav-btn" data-tab="profile"><span class="ico">👤</span><span class="lab">Profil</span></button>
+    </div>
   </div>
 
 <script>
@@ -261,147 +320,290 @@
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) { tg.ready(); tg.expand(); }
 
-  // ── VAQTINCHALIK DIAGNOSTIKA (muammo topilgach olib tashlanadi) ──
-  try {
-    const dbg = document.getElementById('debugLine');
-    const sdk = tg ? 'bor' : 'YO\'Q';
-    const hasInitData = tg && tg.initData ? tg.initData.length : 0;
-    const hasUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? 'bor' : 'yo\'q';
-    const platform = tg ? tg.platform : '-';
-    const ver = tg ? tg.version : '-';
-    dbg.textContent = `[debug] SDK:${sdk} platform:${platform} ver:${ver} initData_len:${hasInitData} user:${hasUser}`;
-  } catch(e){}
+  function haptic(type){ if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(type || 'light'); }
+  function notify(type){ if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(type); }
+  function fmt(n){ try { return Math.round(Number(n)).toLocaleString('ru-RU'); } catch(e){ return n; } }
+  function initials(str){ if(!str) return '?'; return str.trim().split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase(); }
 
-  // ── 1) Darhol ko'rsatish: Telegram bergan user ma'lumotlari (tez) ──
+  // ══════════ TAB NAVIGATSIYASI ══════════
+  const tabs = ['balance','bonus','menu','crash','profile'];
+  function showTab(name){
+    tabs.forEach(t=>{
+      document.getElementById('panel-'+t).classList.toggle('active', t===name);
+    });
+    document.querySelectorAll('.nav-btn').forEach(btn=>{
+      btn.classList.toggle('active', btn.dataset.tab===name);
+    });
+    if (name === 'crash') startCrashPolling();
+  }
+  document.querySelectorAll('.nav-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ haptic('light'); showTab(btn.dataset.tab); });
+  });
+
+  // ══════════ FOYDALANUVCHI MA'LUMOTLARI ══════════
   const tgUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
+  let currentBalance = 0;
 
-  const nameEl = document.getElementById('userName');
-  const idEl = document.getElementById('userId');
-  const unameEl = document.getElementById('userUname');
-  const avatarImg = document.getElementById('avatarImg');
-  const avatarFallback = document.getElementById('avatarFallback');
-
-  function initials(str){
-    if(!str) return '?';
-    return str.trim().split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase();
+  function setAvatar(imgId, fbId, url, fallbackText){
+    const img = document.getElementById(imgId), fb = document.getElementById(fbId);
+    if (url) {
+      img.src = url; img.style.display = 'block'; fb.style.display = 'none';
+      img.onerror = function(){ img.style.display='none'; fb.style.display='flex'; };
+    } else {
+      fb.textContent = fallbackText;
+    }
   }
 
   if (tgUser) {
     const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') || 'Foydalanuvchi';
-    nameEl.textContent = fullName;
-    idEl.textContent = 'ID ' + tgUser.id;
-    unameEl.textContent = tgUser.username ? ('@' + tgUser.username) : '';
-    if (tgUser.photo_url) {
-      avatarImg.src = tgUser.photo_url;
-      avatarImg.style.display = 'block';
-      avatarFallback.style.display = 'none';
-      avatarImg.onerror = function(){ avatarImg.style.display='none'; avatarFallback.style.display='flex'; };
-    } else {
-      avatarFallback.textContent = initials(fullName);
-    }
+    document.getElementById('userName').textContent = fullName;
+    document.getElementById('userId').textContent = 'ID ' + tgUser.id;
+    document.getElementById('userUname').textContent = tgUser.username ? ('@' + tgUser.username) : '';
+    document.getElementById('profileName').textContent = fullName;
+    document.getElementById('profileUname').textContent = tgUser.username ? ('@' + tgUser.username) : '';
+    document.getElementById('profileId').textContent = 'ID ' + tgUser.id;
+    setAvatar('avatarImg','avatarFallback', tgUser.photo_url, initials(fullName));
+    setAvatar('avatarImg2','avatarFallback2', tgUser.photo_url, initials(fullName));
   } else {
-    // Web App tashqarisida ochilsa (masalan brauzerda test qilinsa)
-    nameEl.textContent = 'Mehmon';
-    idEl.textContent = 'ID —';
+    document.getElementById('userName').textContent = 'Mehmon';
   }
 
-  // ── 2) Haqiqiy balansni backend'dan olish (bot profilidagi bilan bir xil) ──
-  const balanceValueEl = document.getElementById('balanceValue');
-
-  function formatFallback(n){
-    try { return Number(n).toLocaleString('ru-RU'); } catch(e){ return n; }
-  }
-
-  async function loadBalance(){
-    if (!tg || !tg.initData) { balanceValueEl.textContent = '0'; return; }
+  async function loadMe(){
+    if (!tg || !tg.initData) return;
     try {
       const res = await fetch('/webapp/api/me?initData=' + encodeURIComponent(tg.initData));
       if (!res.ok) throw new Error('unauthorized');
-      const data = await res.json();
-      balanceValueEl.textContent = formatFallback(data.balance || 0);
-    } catch (e) {
-      balanceValueEl.textContent = '0';
+      const d = await res.json();
+      currentBalance = d.balance || 0;
+      document.getElementById('balanceValue').textContent = fmt(currentBalance);
+      document.getElementById('statDeposited').textContent = fmt(d.total_deposited || 0) + " so'm";
+      document.getElementById('statRefs').textContent = (d.ref_count || 0) + " ta";
+      document.getElementById('pStatBalance').textContent = fmt(currentBalance) + " so'm";
+      document.getElementById('pStatDeposited').textContent = fmt(d.total_deposited || 0) + " so'm";
+      document.getElementById('pStatJoined').textContent = d.joined || '-';
+      document.getElementById('pStatRefs').textContent = (d.ref_count || 0) + " ta";
+    } catch(e) {
+      document.getElementById('balanceValue').textContent = '0';
     }
   }
-  loadBalance();
+  loadMe();
 
-  // ── 3) Balans / + bosilganda — botdagi hisob to'ldirish oqimini ochish ──
   function openDeposit(){
     if (!tg) return;
-    if (tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    haptic('light');
     tg.sendData(JSON.stringify({ action: 'open_deposit' }));
     tg.close();
   }
   document.getElementById('plusBtn').addEventListener('click', openDeposit);
   document.getElementById('balanceBtn').addEventListener('click', openDeposit);
+  document.getElementById('profileMenuBtn').addEventListener('click', function(){
+    if (!tg) return;
+    tg.sendData(JSON.stringify({ action: 'open_profile' }));
+    tg.close();
+  });
 
-  // ── 4) Omad g'ildiragi (demo o'yin — kunlik 1 marta) ──
+  // ══════════ MENYU: tezkor tugmalar ══════════
+  document.querySelectorAll('.menu-item').forEach(function(el){
+    el.addEventListener('click', function(){
+      if (!tg) return;
+      haptic('light');
+      tg.sendData(JSON.stringify({ action: el.dataset.action }));
+      tg.close();
+    });
+  });
+
+  // ══════════ KUNLIK BONUS (g'ildirak + haqiqiy balans) ══════════
   const PRIZES = [
-    { label: '🎉 Omad!',        color: '#7c5cff' },
-    { label: '🔄 Qayta urin',   color: '#3b2f78' },
-    { label: '💎 Bonus',        color: '#ffc93c' },
-    { label: '🔄 Qayta urin',   color: '#3b2f78' },
-    { label: '⭐ Omad!',         color: '#5b3df0' },
-    { label: '🔄 Qayta urin',   color: '#3b2f78' },
-    { label: '🍀 Katta omad',   color: '#ff9d3c' },
-    { label: '🔄 Qayta urin',   color: '#3b2f78' },
+    { label: '🎉 Yutdingiz!', color: '#7c5cff' },
+    { label: '⭐ Omad!',       color: '#3b2f78' },
+    { label: '💎 Bonus',       color: '#ffc93c' },
+    { label: '🍀 Katta omad',  color: '#5b3df0' },
   ];
-
   function buildWheelSVG(){
     const svg = document.querySelector('#wheel svg');
-    const n = PRIZES.length, cx = 50, cy = 50, r = 50;
+    const n = PRIZES.length, cx=50, cy=50, r=50;
     let html = '';
-    for (let i = 0; i < n; i++) {
-      const a0 = (i / n) * 2 * Math.PI - Math.PI/2;
-      const a1 = ((i+1) / n) * 2 * Math.PI - Math.PI/2;
-      const x0 = cx + r * Math.cos(a0), y0 = cy + r * Math.sin(a0);
-      const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+    for (let i=0;i<n;i++){
+      const a0=(i/n)*2*Math.PI-Math.PI/2, a1=((i+1)/n)*2*Math.PI-Math.PI/2;
+      const x0=cx+r*Math.cos(a0), y0=cy+r*Math.sin(a0);
+      const x1=cx+r*Math.cos(a1), y1=cy+r*Math.sin(a1);
       html += `<path d="M${cx},${cy} L${x0},${y0} A${r},${r} 0 0,1 ${x1},${y1} Z" fill="${PRIZES[i].color}" stroke="rgba(0,0,0,.25)" stroke-width="0.5"/>`;
     }
     svg.innerHTML = html;
   }
   buildWheelSVG();
 
-  const spinBtn = document.getElementById('spinBtn');
+  const bonusBtn = document.getElementById('bonusBtn');
+  const bonusResult = document.getElementById('bonusResult');
   const wheelEl = document.getElementById('wheel');
-  const resultEl = document.getElementById('spinResult');
-  const SPIN_KEY = 'lucky_spin_last_date';
+  let bonusRotation = 0;
 
-  function today(){ return new Date().toISOString().slice(0,10); }
+  bonusBtn.addEventListener('click', async function(){
+    if (!tg || !tg.initData) return;
+    bonusBtn.disabled = true;
+    bonusResult.textContent = 'Tekshirilmoqda...';
+    try {
+      const res = await fetch('/webapp/api/daily-bonus', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ initData: tg.initData })
+      });
+      const d = await res.json();
+      if (d.ok) {
+        const idx = Math.floor(Math.random()*PRIZES.length);
+        const seg = 360/PRIZES.length, target = idx*seg + seg/2;
+        bonusRotation += 5*360 + (360-target) - (bonusRotation%360);
+        wheelEl.style.transform = `rotate(${bonusRotation}deg)`;
+        haptic('medium');
+        setTimeout(function(){
+          currentBalance += d.bonus;
+          document.getElementById('balanceValue').textContent = fmt(currentBalance);
+          document.getElementById('pStatBalance').textContent = fmt(currentBalance) + " so'm";
+          bonusResult.innerHTML = `Tabriklaymiz! <b>+${fmt(d.bonus)} so'm</b> balansingizga qo'shildi 🎉`;
+          notify('success');
+        }, 3500);
+      } else {
+        bonusResult.textContent = `Bugungi bonusni allaqachon oldingiz. Qolgan vaqt: ${d.remaining || '-'}`;
+        bonusBtn.disabled = false;
+      }
+    } catch(e) {
+      bonusResult.textContent = 'Xatolik yuz berdi, qayta urinib ko\'ring.';
+      bonusBtn.disabled = false;
+    }
+  });
 
-  function refreshSpinAvailability(){
-    const last = localStorage.getItem(SPIN_KEY);
-    if (last === today()) {
-      spinBtn.disabled = true;
-      spinBtn.textContent = '⏳ Ertaga qayta urining';
-      resultEl.innerHTML = 'Bugungi urinishingiz ishlatildi. Ertaga qaytib keling!';
+  // ══════════ CRASH O'YINI ══════════
+  const betInput = document.getElementById('betInput');
+  const crashBtn = document.getElementById('crashActionBtn');
+  const crashMultEl = document.getElementById('crashMult');
+  const crashResultEl = document.getElementById('crashResult');
+  const crashHistoryEl = document.getElementById('crashHistory');
+  let crashSessionId = null, crashPolling = null, crashRunning = false;
+
+  document.querySelectorAll('.chip').forEach(function(chip){
+    chip.addEventListener('click', function(){
+      let v = parseInt(betInput.value || '0', 10) || 0;
+      if (chip.dataset.amt) v = parseInt(chip.dataset.amt, 10);
+      else if (chip.dataset.half) v = Math.max(1000, Math.floor(v/2));
+      else if (chip.dataset.double) v = v*2;
+      betInput.value = v;
+    });
+  });
+
+  function addHistory(win, mult){
+    const el = document.createElement('div');
+    el.className = 'history-chip ' + (win ? 'win' : 'lose');
+    el.textContent = mult.toFixed(2) + 'x';
+    crashHistoryEl.prepend(el);
+    while (crashHistoryEl.children.length > 10) crashHistoryEl.removeChild(crashHistoryEl.lastChild);
+  }
+
+  function setCrashUiRunning(running){
+    crashRunning = running;
+    crashBtn.textContent = running ? '💸 Yechib olish' : '🚀 Boshlash';
+    betInput.disabled = running;
+  }
+
+  async function startCrash(){
+    if (!tg || !tg.initData) return;
+    const bet = parseInt(betInput.value || '0', 10);
+    if (!bet || bet <= 0) { crashResultEl.textContent = 'Stavka miqdorini kiriting.'; return; }
+    crashBtn.disabled = true;
+    try {
+      const res = await fetch('/webapp/api/crash/start', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ initData: tg.initData, bet: bet })
+      });
+      const d = await res.json();
+      if (d.error === 'no_balance') { crashResultEl.textContent = 'Balansingiz yetarli emas.'; crashBtn.disabled=false; return; }
+      if (d.error === 'bad_bet') { crashResultEl.textContent = 'Stavka chegaradan tashqarida.'; crashBtn.disabled=false; return; }
+      if (d.error === 'active_exists') { crashResultEl.textContent = 'Faol raund allaqachon bor.'; crashBtn.disabled=false; return; }
+      if (d.error) { crashResultEl.textContent = 'Xatolik yuz berdi.'; crashBtn.disabled=false; return; }
+      crashSessionId = d.session_id;
+      currentBalance = d.balance;
+      document.getElementById('balanceValue').textContent = fmt(currentBalance);
+      setCrashUiRunning(true);
+      crashMultEl.className = 'crash-mult running';
+      crashResultEl.textContent = 'Raund davom etmoqda — o\'z vaqtida yechib oling!';
+      haptic('medium');
+      crashBtn.disabled = false;
+      pollCrash();
+    } catch(e) {
+      crashResultEl.textContent = 'Xatolik yuz berdi.';
+      crashBtn.disabled = false;
     }
   }
-  refreshSpinAvailability();
 
-  let spinning = false, currentRotation = 0;
-  spinBtn.addEventListener('click', function(){
-    if (spinning || spinBtn.disabled) return;
-    spinning = true;
-    spinBtn.disabled = true;
-    const idx = Math.floor(Math.random() * PRIZES.length);
-    const segAngle = 360 / PRIZES.length;
-    const targetCenter = idx * segAngle + segAngle/2;
-    const extraSpins = 5 * 360;
-    currentRotation += extraSpins + (360 - targetCenter) - (currentRotation % 360);
-    wheelEl.style.transform = `rotate(${currentRotation}deg)`;
-    resultEl.textContent = 'Aylanmoqda...';
-    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('medium');
+  async function pollCrash(){
+    if (crashPolling) clearInterval(crashPolling);
+    crashPolling = setInterval(async function(){
+      if (!crashSessionId) { clearInterval(crashPolling); return; }
+      try {
+        const res = await fetch(`/webapp/api/crash/status?initData=${encodeURIComponent(tg.initData)}&session_id=${crashSessionId}`);
+        const d = await res.json();
+        if (d.status === 'running') {
+          crashMultEl.textContent = d.multiplier.toFixed(2) + 'x';
+        } else if (d.status === 'crashed') {
+          clearInterval(crashPolling);
+          crashMultEl.textContent = d.crash_point.toFixed(2) + 'x';
+          crashMultEl.className = 'crash-mult crashed';
+          crashResultEl.textContent = 'Portladi! Stavka kuydi. Keyingi safar omad tilaymiz.';
+          addHistory(false, d.crash_point);
+          setCrashUiRunning(false);
+          crashSessionId = null;
+          notify('error');
+        }
+      } catch(e){}
+    }, 400);
+  }
 
-    setTimeout(function(){
-      resultEl.innerHTML = 'Natija: <b>' + PRIZES[idx].label + '</b>';
-      localStorage.setItem(SPIN_KEY, today());
-      spinning = false;
-      refreshSpinAvailability();
-      if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
-    }, 4300);
+  function startCrashPolling(){
+    if (crashSessionId && !crashPolling) pollCrash();
+  }
+
+  async function cashoutCrash(){
+    if (!crashSessionId) return;
+    crashBtn.disabled = true;
+    try {
+      const res = await fetch('/webapp/api/crash/cashout', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ initData: tg.initData, session_id: crashSessionId })
+      });
+      const d = await res.json();
+      if (crashPolling) clearInterval(crashPolling);
+      if (d.ok) {
+        currentBalance = d.balance;
+        document.getElementById('balanceValue').textContent = fmt(currentBalance);
+        crashMultEl.textContent = d.multiplier.toFixed(2) + 'x';
+        crashMultEl.className = 'crash-mult won';
+        crashResultEl.innerHTML = `Yutdingiz! <b>+${fmt(d.win)} so'm</b> (${d.multiplier.toFixed(2)}x)`;
+        addHistory(true, d.multiplier);
+        notify('success');
+      } else {
+        crashMultEl.textContent = (d.crash_point || 0).toFixed(2) + 'x';
+        crashMultEl.className = 'crash-mult crashed';
+        crashResultEl.textContent = 'Kech qoldingiz — allaqachon portlagan edi.';
+        addHistory(false, d.crash_point || 0);
+        notify('error');
+      }
+    } catch(e) {
+      crashResultEl.textContent = 'Xatolik yuz berdi.';
+    }
+    setCrashUiRunning(false);
+    crashSessionId = null;
+    crashBtn.disabled = false;
+  }
+
+  crashBtn.addEventListener('click', function(){
+    if (crashRunning) cashoutCrash(); else startCrash();
   });
+
 })();
 </script>
 </body>
 </html>
+HTMLEOF
+echo "written"
+Output
+
+Input validation errors occurred:
+description: Field required
