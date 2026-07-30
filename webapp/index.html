@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+  <!DOCTYPE html>
 <html lang="uz">
 <head>
 <meta charset="UTF-8">
@@ -543,7 +543,7 @@
     });
   });
 
-  actionBtn.addEventListener('click', async () => {
+  actionBtn.addEventListener('click', () => {
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
     if (gameState === 'WAITING' && !myBetState.placed) {
@@ -556,30 +556,8 @@
         alert("Balans yetarli emas!");
         return;
       }
-
-      // REAL balansni serverda (bot bazasida) kamaytiramiz — faqat ekranda emas
-      actionBtn.disabled = true;
-      try {
-        const res = await fetch('/webapp/api/bet', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData: tg.initData, amount: amt })
-        });
-        const d = await res.json();
-        if (!res.ok || !d.ok) {
-          alert(d.error === 'insufficient_funds' ? "Balans yetarli emas!" : "Xatolik yuz berdi, qayta urinib ko'ring.");
-          actionBtn.disabled = false;
-          return;
-        }
-        currentBalance = d.balance;
-        updateBalanceUI();
-      } catch (e) {
-        alert("Server bilan bog'lanishda xatolik. Internetni tekshiring.");
-        actionBtn.disabled = false;
-        return;
-      }
-      actionBtn.disabled = false;
-
+      currentBalance -= amt;
+      updateBalanceUI();
       myBetState = { placed: true, amount: amt, cashedOut: false, winAmt: 0, lost: false };
       actionBtn.textContent = "Kutilmoqda...";
       actionBtn.className = "big-btn disabled";
@@ -589,25 +567,9 @@
     else if (gameState === 'RUNNING' && myBetState.placed && !myBetState.cashedOut) {
       myBetState.cashedOut = true;
       myBetState.winAmt = Math.round(myBetState.amount * currentMult);
-
-      // REAL balansga yutuqni serverda qo'shamiz
-      try {
-        const res = await fetch('/webapp/api/cashout', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ initData: tg.initData, amount: myBetState.winAmt })
-        });
-        const d = await res.json();
-        if (res.ok && d.ok) {
-          currentBalance = d.balance;
-        } else {
-          currentBalance += myBetState.winAmt;
-        }
-      } catch (e) {
-        currentBalance += myBetState.winAmt;
-      }
+      currentBalance += myBetState.winAmt;
       updateBalanceUI();
-
+      
       playWinSound();
       haptic('heavy');
       notify('success');
