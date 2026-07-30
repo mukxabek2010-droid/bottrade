@@ -156,6 +156,15 @@ LANGS = {
         "btn_proofs": "✅ Isbotlar",
         "btn_add_trade": "➕ Trade qo'shish",
         "btn_add_sale": "➕ Sotish qo'shish",
+        "btn_trade_menu": "🔄 Trade",
+        "btn_duel_menu": "⚔️ Duel",
+        "btn_sotuv_menu": "🛍 Sotuv",
+        "btn_accounts_menu": "👤 Akkauntlar",
+        "btn_pro_menu": "💎 Pro",
+        "menu_add": "➕ Qo'shish",
+        "menu_view": "👀 Ko'rish",
+        "acc_buy": "🛒 Akkount olish",
+        "acc_sell": "💰 Akkount sotish",
         "btn_online": "🌐 Online Traderlar",
         "btn_cart": "🛒 Savat",
         "btn_ad": "📣 Reklama qilish",
@@ -225,6 +234,15 @@ LANGS = {
         "btn_proofs": "✅ Proofs",
         "btn_add_trade": "➕ Add Trade",
         "btn_add_sale": "➕ Add Sale",
+        "btn_trade_menu": "🔄 Trade",
+        "btn_duel_menu": "⚔️ Duel",
+        "btn_sotuv_menu": "🛍 Sale",
+        "btn_accounts_menu": "👤 Accounts",
+        "btn_pro_menu": "💎 Pro",
+        "menu_add": "➕ Add",
+        "menu_view": "👀 View",
+        "acc_buy": "🛒 Buy account",
+        "acc_sell": "💰 Sell account",
         "btn_online": "🌐 Online Traders",
         "btn_cart": "🛒 Cart",
         "btn_ad": "📣 Advertise",
@@ -294,6 +312,15 @@ LANGS = {
         "btn_proofs": "✅ Пруфы",
         "btn_add_trade": "➕ Добавить трейд",
         "btn_add_sale": "➕ Добавить продажу",
+        "btn_trade_menu": "🔄 Трейд",
+        "btn_duel_menu": "⚔️ Дуэль",
+        "btn_sotuv_menu": "🛍 Продажа",
+        "btn_accounts_menu": "👤 Аккаунты",
+        "btn_pro_menu": "💎 Про",
+        "menu_add": "➕ Добавить",
+        "menu_view": "👀 Смотреть",
+        "acc_buy": "🛒 Купить аккаунт",
+        "acc_sell": "💰 Продать аккаунт",
         "btn_online": "🌐 Онлайн трейдеры",
         "btn_cart": "🛒 Корзина",
         "btn_ad": "📣 Реклама",
@@ -778,7 +805,7 @@ async def remove_from_sale_cart(uid: int, sale_id: str):
 ROBUX_PRICES = [
     (40, 7000), (80, 14000), (120, 21000), (160, 28000), (200, 35000),
     (240, 42000), (280, 49000), (320, 55000), (360, 61000), (500, 66000),
-    (1000, 130000), (2000, 255000), (5250, 600000),
+    (1000, 130000), (2000, 255000),
 ]
 
 ROBLOX_PLUS_OPTIONS = [
@@ -1112,12 +1139,10 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_buy"))
     b.button(text=T(lang, "btn_profile"))
     b.button(text=T(lang, "btn_deposit"))
-    b.button(text=T(lang, "btn_trades"))
-    b.button(text=T(lang, "btn_sales"))
-    b.button(text=T(lang, "btn_duel"))
-    b.button(text=T(lang, "btn_duel_list"))
-    b.button(text=T(lang, "btn_add_trade"))
-    b.button(text=T(lang, "btn_add_sale"))
+    b.button(text=T(lang, "btn_trade_menu"))
+    b.button(text=T(lang, "btn_duel_menu"))
+    b.button(text=T(lang, "btn_sotuv_menu"))
+    b.button(text=T(lang, "btn_accounts_menu"))
     b.button(text=T(lang, "btn_online"))
     b.button(text=T(lang, "btn_cart"))
     b.button(text=T(lang, "btn_ad"))
@@ -1129,9 +1154,16 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_proofs"))
     b.button(text=T(lang, "btn_bloxfruit"))
     b.button(text="🤖 AI Yordamchi")
+    b.button(text=T(lang, "btn_pro_menu"))
     b.button(text=T(lang, "btn_change_lang"))
-    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1)
+    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 1)
     return b.as_markup(resize_keyboard=True)
+
+def _as_user_msg(cb: types.CallbackQuery) -> types.Message:
+    """Callback query'dagi xabarni asl foydalanuvchi (cb.from_user) nomidan
+    yuborilgandek qilib beradi — eski message-based handlerlarni callback
+    orqali qayta ishlatish uchun."""
+    return cb.message.model_copy(update={"from_user": cb.from_user})
 
 def cancel_kb(lang="uz"):
     b = ReplyKeyboardBuilder()
@@ -2942,14 +2974,12 @@ async def cmd_bloxfruit(msg: types.Message, state: FSMContext):
         return
     await send_event_sticker(msg.chat.id, "bloxfruit")
     b = InlineKeyboardBuilder()
-    b.button(text="📦 Stock", callback_data="bf_stock")
-    b.button(text="🛠 Xizmatlar", callback_data="bf_services")
-    b.adjust(2)
+    b.button(text="🍈 Kanalga o'tish", url="https://t.me/veko_blox_fruit")
+    b.adjust(1)
     await msg.answer(
         "🍈 *Blox Fruit bo'limi*\n\n"
-        "📦 *Stock* — omborimizdagi mavjud narsalar joylanadigan kanal\n"
-        "🛠 *Xizmatlar* — level ko'tarish, pul, raid va boshqa xizmatlar\n\n"
-        "👇 Bo'limni tanlang:",
+        "Blox Fruit bilan bog'liq barcha narsalarni (stock, xizmatlar, yangiliklar) "
+        "shu yerdan ko'rishingiz mumkin:\n@veko_blox_fruit",
         reply_markup=b.as_markup()
     )
 
@@ -3462,7 +3492,8 @@ async def admin_panel_kb():
     b.button(text="💱 Valyuta kurslari",           callback_data="adm_rates")
     b.button(text="🎭 Stikerlar boshqaruvi",       callback_data="adm_sticker_menu")
     b.button(text="📦 Stock kanal havolasi",       callback_data="adm_stock_url")
-    b.adjust(2, 2, 2, 2, 2, 1, 1)
+    b.button(text="💎 Pro ilova yuklash",          callback_data="adm_pro_upload")
+    b.adjust(2, 2, 2, 2, 2, 1, 1, 1)
     return b.as_markup(), cnt, or_, tr, sl
 
 @dp.message(Command("admin"))
@@ -5531,6 +5562,302 @@ async def broadcast_scheduler_loop():
         except Exception as e:
             logging.error(f"Broadcast scheduler xatosi: {e}")
         await asyncio.sleep(30)
+
+
+# ═══════════════════════════════════════════════════════
+# TRADE / DUEL / SOTUV — BIRLASHTIRILGAN MENYU
+# (har biri bosilganda 2 ta bo'lim chiqadi: Qo'shish / Ko'rish)
+# ═══════════════════════════════════════════════════════
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_trade_menu") for l in LANGS)))
+async def cmd_trade_menu(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    lang = await get_user_lang(msg.from_user.id)
+    b = InlineKeyboardBuilder()
+    b.button(text=T(lang, "menu_add"), callback_data="menu_trade_add")
+    b.button(text=T(lang, "menu_view"), callback_data="menu_trade_view")
+    b.adjust(2)
+    await msg.answer(f"{T(lang, 'btn_trade_menu')}\n\n👇 Bo'limni tanlang:", reply_markup=b.as_markup())
+
+@dp.callback_query(F.data == "menu_trade_add")
+async def cb_menu_trade_add(cb: types.CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await cmd_trade_add(_as_user_msg(cb), state)
+
+@dp.callback_query(F.data == "menu_trade_view")
+async def cb_menu_trade_view(cb: types.CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await cmd_trades(_as_user_msg(cb), state)
+
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_duel_menu") for l in LANGS)))
+async def cmd_duel_menu(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    lang = await get_user_lang(msg.from_user.id)
+    b = InlineKeyboardBuilder()
+    b.button(text=T(lang, "menu_add"), callback_data="menu_duel_add")
+    b.button(text=T(lang, "menu_view"), callback_data="menu_duel_view")
+    b.adjust(2)
+    await msg.answer(f"{T(lang, 'btn_duel_menu')}\n\n👇 Bo'limni tanlang:", reply_markup=b.as_markup())
+
+@dp.callback_query(F.data == "menu_duel_add")
+async def cb_menu_duel_add(cb: types.CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await cmd_duel_add(_as_user_msg(cb), state)
+
+@dp.callback_query(F.data == "menu_duel_view")
+async def cb_menu_duel_view(cb: types.CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await cmd_duel_list(_as_user_msg(cb), state)
+
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_sotuv_menu") for l in LANGS)))
+async def cmd_sotuv_menu(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    lang = await get_user_lang(msg.from_user.id)
+    b = InlineKeyboardBuilder()
+    b.button(text=T(lang, "menu_add"), callback_data="menu_sale_add")
+    b.button(text=T(lang, "menu_view"), callback_data="menu_sale_view")
+    b.adjust(2)
+    await msg.answer(f"{T(lang, 'btn_sotuv_menu')}\n\n👇 Bo'limni tanlang:", reply_markup=b.as_markup())
+
+@dp.callback_query(F.data == "menu_sale_add")
+async def cb_menu_sale_add(cb: types.CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await cmd_sale_add(_as_user_msg(cb), state)
+
+@dp.callback_query(F.data == "menu_sale_view")
+async def cb_menu_sale_view(cb: types.CallbackQuery, state: FSMContext):
+    await cb.answer()
+    await cmd_sales(_as_user_msg(cb), state)
+
+
+# ═══════════════════════════════════════════════════════
+# AKKAUNTLAR BO'LIMI (Akkount olish / Akkount sotish)
+# ═══════════════════════════════════════════════════════
+accounts_col = mdb["accounts"]
+
+class AccountSell(StatesGroup):
+    name  = State()
+    photo = State()
+    price = State()
+    bio   = State()
+
+async def active_accounts():
+    return await accounts_col.find({"active": True}).sort("created_at", -1).to_list(length=200)
+
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_accounts_menu") for l in LANGS)))
+async def cmd_accounts_menu(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    lang = await get_user_lang(msg.from_user.id)
+    b = InlineKeyboardBuilder()
+    b.button(text=T(lang, "acc_buy"), callback_data="acc_buy")
+    b.button(text=T(lang, "acc_sell"), callback_data="acc_sell")
+    b.adjust(2)
+    await msg.answer(f"{T(lang, 'btn_accounts_menu')}\n\n👇 Bo'limni tanlang:", reply_markup=b.as_markup())
+
+@dp.callback_query(F.data == "acc_sell")
+async def cb_acc_sell(cb: types.CallbackQuery, state: FSMContext):
+    lang = await get_user_lang(cb.from_user.id)
+    await cb.message.answer("👤 Sotmoqchi bo'lgan akkountingiz nomi/nima ekanini yozing:", reply_markup=cancel_kb(lang))
+    await state.set_state(AccountSell.name)
+    await cb.answer()
+
+@dp.message(AccountSell.name)
+async def acc_sell_name(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    await state.update_data(acc_name=msg.text)
+    await msg.answer("📸 Akkount rasmini (screenshot) yuboring yoki o'tkazib yuboring:", reply_markup=skip_cancel_kb(lang))
+    await state.set_state(AccountSell.photo)
+
+@dp.message(AccountSell.photo, F.photo)
+async def acc_sell_photo(msg: types.Message, state: FSMContext):
+    await state.update_data(acc_photo=msg.photo[-1].file_id)
+    lang = await get_user_lang(msg.from_user.id)
+    await msg.answer("💰 Narxini kiriting (so'mda):", reply_markup=cancel_kb(lang))
+    await state.set_state(AccountSell.price)
+
+@dp.message(AccountSell.photo)
+async def acc_sell_no_photo(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel") or msg.text == T(lang, "skip"):
+        if msg.text == T(lang, "cancel"):
+            await state.clear()
+            await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+            return
+        await state.update_data(acc_photo=None)
+        await msg.answer("💰 Narxini kiriting (so'mda):", reply_markup=cancel_kb(lang))
+        await state.set_state(AccountSell.price)
+        return
+    await state.update_data(acc_photo=None)
+    await msg.answer("💰 Narxini kiriting (so'mda):", reply_markup=cancel_kb(lang))
+    await state.set_state(AccountSell.price)
+
+@dp.message(AccountSell.price)
+async def acc_sell_price(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = (msg.text or "").strip().replace(" ", "")
+    if not txt.isdigit():
+        await msg.answer("❌ Faqat raqam kiriting:")
+        return
+    await state.update_data(acc_price=int(txt))
+    await msg.answer("📝 Akkount haqida qisqacha ma'lumot yozing (inventar, level va h.k.) yoki o'tkazib yuboring:", reply_markup=skip_cancel_kb(lang))
+    await state.set_state(AccountSell.bio)
+
+@dp.message(AccountSell.bio)
+async def acc_sell_bio(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    bio = "" if msg.text == T(lang, "skip") else (msg.text or "")
+    d = await state.get_data()
+    doc = {
+        "user_id": uid,
+        "username": msg.from_user.username or "",
+        "name": d.get("acc_name", ""),
+        "photo_id": d.get("acc_photo"),
+        "price": d.get("acc_price", 0),
+        "bio": bio,
+        "active": True,
+        "created_at": now(),
+    }
+    res = await accounts_col.insert_one(doc)
+    await state.clear()
+    await msg.answer(
+        f"✅ Akkount e'lon qilindi! *#{short_id(res.inserted_id)}*",
+        reply_markup=main_kb(lang)
+    )
+
+@dp.callback_query(F.data == "acc_buy")
+async def cb_acc_buy(cb: types.CallbackQuery):
+    lang = await get_user_lang(cb.from_user.id)
+    items = await active_accounts()
+    if not items:
+        await cb.answer("Hozircha sotuvdagi akkountlar yo'q.", show_alert=True)
+        return
+    await _send_account_page(cb, items, 0, lang=lang)
+    await cb.answer()
+
+async def _send_account_page(target, items, page, is_cb=True, lang="uz"):
+    a = items[page]
+    caption = (
+        f"👤 *Akkount #{short_id(a['_id'])}*\n"
+        f"━━━━━━━━━━━━━━━━━━━━\n"
+        f"[{page+1}/{len(items)}]\n\n"
+        f"📦 *{esc_md(a.get('name',''))}*\n\n"
+        f"📝 {esc_md(a.get('bio') or '—')}\n\n"
+        f"💰 *{a.get('price',0):,} so'm*\n\n"
+        f"📅 {a.get('created_at','')}\n━━━━━━━━━━━━━━━━━━━━"
+    )
+    b = InlineKeyboardBuilder()
+    if page > 0:
+        b.button(text="⬅️ Oldingi", callback_data=f"acc_p_{page-1}")
+    if page < len(items) - 1:
+        b.button(text="➡️ Keyingi", callback_data=f"acc_p_{page+1}")
+    uname = a.get("username", "")
+    if uname:
+        b.button(text="💬 Murojaat", url=f"https://t.me/{uname}")
+    b.adjust(2, 1)
+    if is_cb:
+        await _send_or_edit(target, a.get("photo_id"), caption, b.as_markup())
+    else:
+        if a.get("photo_id"):
+            await target.answer_photo(a["photo_id"], caption=caption, reply_markup=b.as_markup())
+        else:
+            await target.answer(caption, reply_markup=b.as_markup())
+
+@dp.callback_query(F.data.startswith("acc_p_"))
+async def cb_acc_page(cb: types.CallbackQuery):
+    lang = await get_user_lang(cb.from_user.id)
+    page = int(cb.data[len("acc_p_"):])
+    items = await active_accounts()
+    if not items:
+        await cb.answer("Hozircha sotuvdagi akkountlar yo'q.", show_alert=True)
+        return
+    page = max(0, min(page, len(items) - 1))
+    await _send_account_page(cb, items, page, lang=lang)
+    await cb.answer()
+
+
+# ═══════════════════════════════════════════════════════
+# PRO BO'LIMI (Trader ilova — admin yuklaydi, foydalanuvchi oladi)
+# ═══════════════════════════════════════════════════════
+pro_app_col = mdb["pro_app"]
+
+class ProAppUpload(StatesGroup):
+    file = State()
+
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_pro_menu") for l in LANGS)))
+async def cmd_pro_menu(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    lang = await get_user_lang(msg.from_user.id)
+    doc = await pro_app_col.find_one({"_id": "current"})
+    if not doc or not doc.get("file_id"):
+        await msg.answer("💎 *Pro*\n\nHozircha ilova yuklanmagan. Tez orada qo'shiladi!")
+        return
+    b = InlineKeyboardBuilder()
+    b.button(text="📥 Yuklab olish", callback_data="pro_get_file")
+    b.adjust(1)
+    await msg.answer(
+        f"💎 *Pro — Trader ilovasi*\n\n{doc.get('caption','')}\n\n👇 Yuklab olish uchun bosing:",
+        reply_markup=b.as_markup()
+    )
+
+@dp.callback_query(F.data == "pro_get_file")
+async def cb_pro_get_file(cb: types.CallbackQuery):
+    doc = await pro_app_col.find_one({"_id": "current"})
+    if not doc or not doc.get("file_id"):
+        await cb.answer("Ilova topilmadi.", show_alert=True)
+        return
+    await cb.message.answer_document(doc["file_id"], caption="💎 Pro — Trader ilovasi")
+    await cb.answer()
+
+# ── Admin: Pro ilovani yuklash/yangilash ──
+@dp.callback_query(F.data == "adm_pro_upload")
+async def adm_pro_upload(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    await cb.message.answer("📎 Pro ilovaning faylini (.apk yoki boshqa) yuboring:", reply_markup=cancel_kb())
+    await state.set_state(ProAppUpload.file)
+    await cb.answer()
+
+@dp.message(ProAppUpload.file, F.document)
+async def adm_pro_file_got(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    await pro_app_col.update_one(
+        {"_id": "current"},
+        {"$set": {
+            "file_id": msg.document.file_id,
+            "caption": msg.caption or "",
+            "uploaded_at": now(),
+            "uploaded_by": msg.from_user.id,
+        }},
+        upsert=True
+    )
+    await state.clear()
+    await msg.answer("✅ Pro ilova muvaffaqiyatli yuklandi/yangilandi!", reply_markup=main_kb(lang))
+
+@dp.message(ProAppUpload.file)
+async def adm_pro_file_wrong(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    await msg.answer("❌ Iltimos, fayl (document) ko'rinishida yuboring:")
 
 
 # ═══════════════════════════════════════════════════════
