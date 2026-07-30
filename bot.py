@@ -26,6 +26,7 @@ from telethon.sessions import StringSession
 from telethon.errors import (
     SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError,
     PasswordHashInvalidError, FloodWaitError, PhoneNumberInvalidError,
+    ResendCodeRequestError,
 )
 from telethon.tl.types import Channel, Chat, InputPeerChannel
 
@@ -5019,13 +5020,34 @@ async def ub_resend_sms(cb: types.CallbackQuery, state: FSMContext):
         await cb.answer("Sessiya tugagan, qaytadan boshlang.", show_alert=True)
         return
     try:
-        sent = await pend["client"].send_code_request(pend["phone"], force_sms=True)
+        # force_sms endi Telethon'da ishlamaydi (deprecated).
+        # phone_code_hash bilan qayta so'ralsa, Telegram o'zi navbatdagi
+        # usulni (SMS/Call/App) avtomatik tanlaydi.
+        sent = await pend["client"].send_code_request(
+            pend["phone"], phone_code_hash=pend["phone_code_hash"]
+        )
         pend["phone_code_hash"] = sent.phone_code_hash
-        await cb.answer("📩 SMS qayta yuborildi!", show_alert=True)
+        type_name = type(sent.type).__name__
+        if "Sms" in type_name:
+            txt = "📩 SMS qayta yuborildi!"
+        elif "Call" in type_name:
+            txt = "☎️ Qo'ng'iroq orqali kod yuborildi!"
+        elif "App" in type_name:
+            txt = "📲 Kod ilova orqali yuborildi (bu raqam uchun boshqa usul mavjud emas)."
+        else:
+            txt = f"ℹ️ Kod qayta yuborildi ({type_name})."
+        await cb.answer(txt, show_alert=True)
     except FloodWaitError as e:
         await cb.answer(f"❌ Juda ko'p urinish. {e.seconds} soniyadan keyin urining.", show_alert=True)
+    except ResendCodeRequestError:
+        await cb.answer(
+            "❌ Bu raqam uchun barcha yuborish usullari (flash-call, SMS) allaqachon "
+            "ishlatilgan. Kod Telegram ilovangizdagi \"Telegram\" rasmiy xabarlar "
+            "bo'limida bo'lishi mumkin, yoki birozdan keyin qaytadan urinib ko'ring.",
+            show_alert=True
+        )
     except Exception as e:
-        logging.error(f"force_sms xatosi: {e}")
+        logging.error(f"resend xatosi: {e}")
         await cb.answer("❌ Xatolik yuz berdi.", show_alert=True)
 
 
