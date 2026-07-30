@@ -455,32 +455,30 @@ def esc_md(text) -> str:
         text = text.replace(ch, "\\" + ch)
     return text
 
-def verify_webapp_init_data(init_data: str, bot_token: str) -> dict | None:
-    """Telegram Web App yuborgan initData'ni tasdiqlaydi (Telegram hujjatidagi
-    rasmiy algoritm bo'yicha). To'g'ri bo'lsa — ichidagi 'user' obyektini va
-    boshqa maydonlarni qaytaradi, aks holda None."""
-    if not init_data:
+def verify_init_data(init_data: str):
+    """Telegram Web App yuborgan initData'ni tekshiradi (rasmiy Telegram algoritmi bo'yicha)
+    va ichidagi foydalanuvchi ma'lumotini qaytaradi. Soxta/o'zgartirilgan bo'lsa None qaytaradi."""
+    if not init_data or not BOT_TOKEN:
         return None
     try:
         parsed = dict(parse_qsl(init_data, strict_parsing=True))
     except ValueError:
         return None
-    recv_hash = parsed.pop("hash", None)
-    if not recv_hash:
+    received_hash = parsed.pop("hash", None)
+    if not received_hash:
         return None
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
-    secret_key = hmac.new(b"WebAppData", bot_token.encode(), hashlib.sha256).digest()
+    secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
     calc_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(calc_hash, recv_hash):
+    if not hmac.compare_digest(calc_hash, received_hash):
         return None
-    result = dict(parsed)
-    if "user" in result:
-        try:
-            result["user"] = json.loads(result["user"])
-        except Exception:
-            result["user"] = {}
-    return result
-
+    user_raw = parsed.get("user")
+    if not user_raw:
+        return None
+    try:
+        return json.loads(user_raw)
+    except Exception:
+        return None
 
 async def get_user(uid):
     return await users.find_one({"user_id": uid})
@@ -547,6 +545,10 @@ async def add_balance(uid, amt):
 
 async def sub_balance(uid, amt):
     await users.update_one({"user_id": uid}, {"$inc": {"balance": -amt}})
+
+async def inc_balance_only(uid, amt):
+    """Faqat balance'ni oshiradi, total_deposited'ga tegmaydi (masalan o'yin yutuqlari uchun)."""
+    await users.update_one({"user_id": uid}, {"$inc": {"balance": amt}})
 
 async def users_count():
     return await users.count_documents({})
@@ -1194,12 +1196,7 @@ def main_kb(lang="uz"):
     b.button(text="🤖 AI Yordamchi")
     b.button(text=T(lang, "btn_pro_menu"))
     if WEBAPP_URL:
-        # Eslatma: bu yerda ATAYLAB oddiy matnli tugma qo'yilgan (web_app emas).
-        # Reply-klaviaturadagi web_app tugmasi ba'zi Telegram mijozlarida
-        # initData'ni ishonchli uzatmaydi. Shuning uchun bosilganda pastdagi
-        # cmd_game_open handleri ishga tushib, INLINE web_app tugmasi bilan
-        # Web App'ni ochadi — bu barcha platformada ishonchli ishlaydi.
-        b.button(text=T(lang, "btn_game"))
+        b.button(text=T(lang, "btn_game"), web_app=WebAppInfo(url=WEBAPP_URL))
     else:
         b.button(text=T(lang, "btn_game"))
     b.button(text=T(lang, "btn_change_lang"))
@@ -1622,11 +1619,12 @@ async def cb_my_sales(cb: types.CallbackQuery):
 # ═══════════════════════════════════════════════════════
 # HISOB TO'LDIRISH
 # ═══════════════════════════════════════════════════════
-async def send_deposit_menu(msg: types.Message):
-    """Hisob to'ldirish miqdorlari menyusini chiqaradi. Bot ichidagi '💰 Hisob
-    to'ldirish' tugmasidan ham, Yutuqli o'yin Web App'idagi balans/+ tugmasidan
-    ham xuddi shu funksiya chaqiriladi — ikkalasida ham bir xil oqim ishlaydi."""
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_deposit") for l in LANGS)))
+async def cmd_deposit(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
     uid = msg.from_user.id
+    await send_event_sticker(msg.chat.id, "deposit")
     lang = await get_user_lang(uid)
     rates = await get_currency_rates()
     b = InlineKeyboardBuilder()
@@ -1638,29 +1636,6 @@ async def send_deposit_menu(msg: types.Message):
     b.button(text="✏️ Boshqa miqdor", callback_data="damt_custom")
     b.adjust(2)
     await msg.answer("💰 *Hisob to'ldirish*\n\n📌 To'lov karta orqali FAQAT so'mda qabul qilinadi (qavs ichida taxminiy ekvivalent ko'rsatilgan).\n\nQancha to'ldirmoqchisiz?", reply_markup=b.as_markup())
-
-
-@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_deposit") for l in LANGS)))
-async def cmd_deposit(msg: types.Message, state: FSMContext):
-    if not await check_access(msg, state):
-        return
-    await send_event_sticker(msg.chat.id, "deposit")
-    await send_deposit_menu(msg)
-
-
-@dp.message(F.web_app_data)
-async def on_webapp_data(msg: types.Message, state: FSMContext):
-    """Yutuqli o'yin Web App'idan (masalan, balans ustidagi '+' tugmasidan)
-    kelgan ma'lumotni qabul qiladi. Web App tg.sendData(...) chaqirganda,
-    Telegram bu xabarni oddiy chat xabari sifatida botga yuboradi."""
-    try:
-        payload = json.loads(msg.web_app_data.data)
-    except Exception:
-        payload = {}
-    if payload.get("action") == "open_deposit":
-        if not await check_access(msg, state):
-            return
-        await send_deposit_menu(msg)
 
 @dp.callback_query(F.data.startswith("damt_"))
 async def cb_damt(cb: types.CallbackQuery, state: FSMContext):
@@ -4482,20 +4457,6 @@ async def cmd_game_not_configured(msg: types.Message, state: FSMContext):
         return
     await msg.answer("⚙️ Web App manzili hali sozlanmagan. Iltimos, admin bilan bog'laning.")
 
-
-@dp.message(F.func(lambda msg: bool(WEBAPP_URL) and any(msg.text == T(l, "btn_game") for l in LANGS)))
-async def cmd_game_open(msg: types.Message, state: FSMContext):
-    """Web App'ni INLINE tugma orqali ochadi (reply-klaviatura o'rniga) — bu
-    barcha Telegram mijozlarida (mobil, desktop) foydalanuvchi ma'lumotlari
-    (initData: id, ism, rasm) ishonchli uzatilishini ta'minlaydi."""
-    if not await check_access(msg, state):
-        return
-    lang = await get_user_lang(msg.from_user.id)
-    b = InlineKeyboardBuilder()
-    b.button(text=T(lang, "btn_game"), web_app=WebAppInfo(url=WEBAPP_URL))
-    b.adjust(1)
-    await msg.answer("🏆 Yutuqli o'yinni ochish uchun tugmani bosing:", reply_markup=b.as_markup())
-
 # ═══════════════════════════════════════════════════════
 # 🎁 REFERAL BO'LIMI
 # ═══════════════════════════════════════════════════════
@@ -5979,6 +5940,80 @@ async def on_startup_polling():
     logging.info("✅ Bot polling rejimida ishga tushdi")
 
 
+def _json_cors(data, status=200):
+    return web.json_response(data, status=status, headers={
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Headers": "Content-Type",
+    })
+
+MIN_BET = 1000
+MAX_BET = 200_000
+
+async def webapp_api_me(request: web.Request):
+    init_data = request.query.get("initData", "")
+    tg_user = verify_init_data(init_data)
+    if not tg_user:
+        return _json_cors({"error": "unauthorized"}, status=401)
+    uid = tg_user["id"]
+    await upsert_user(uid, tg_user.get("username", ""))
+    u = await users.find_one({"user_id": uid}) or {}
+    ref_count = await get_ref_count(uid)
+    return _json_cors({
+        "balance": u.get("balance", 0),
+        "total_deposited": u.get("total_deposited", 0),
+        "joined": u.get("joined", ""),
+        "ref_count": ref_count,
+    })
+
+async def webapp_api_bet(request: web.Request):
+    try:
+        body = await request.json()
+    except Exception:
+        return _json_cors({"error": "bad_request"}, status=400)
+    tg_user = verify_init_data(body.get("initData", ""))
+    if not tg_user:
+        return _json_cors({"error": "unauthorized"}, status=401)
+    uid = tg_user["id"]
+    try:
+        amount = int(body.get("amount", 0))
+    except (TypeError, ValueError):
+        return _json_cors({"error": "bad_amount"}, status=400)
+    if amount < MIN_BET or amount > MAX_BET:
+        return _json_cors({"error": "bad_amount"}, status=400)
+    bal = await get_balance(uid)
+    if amount > bal:
+        return _json_cors({"error": "insufficient_funds", "balance": bal}, status=400)
+    await sub_balance(uid, amount)
+    new_bal = await get_balance(uid)
+    return _json_cors({"ok": True, "balance": new_bal})
+
+async def webapp_api_cashout(request: web.Request):
+    try:
+        body = await request.json()
+    except Exception:
+        return _json_cors({"error": "bad_request"}, status=400)
+    tg_user = verify_init_data(body.get("initData", ""))
+    if not tg_user:
+        return _json_cors({"error": "unauthorized"}, status=401)
+    uid = tg_user["id"]
+    try:
+        amount = int(body.get("amount", 0))
+    except (TypeError, ValueError):
+        return _json_cors({"error": "bad_amount"}, status=400)
+    if amount < 0:
+        return _json_cors({"error": "bad_amount"}, status=400)
+    await inc_balance_only(uid, amount)
+    new_bal = await get_balance(uid)
+    return _json_cors({"ok": True, "balance": new_bal})
+
+async def webapp_api_options(request: web.Request):
+    return web.Response(status=200, headers={
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+    })
+
+
 async def _run_health_server():
     """Render 'Web Service' turi uchun port ochib turadigan yengil server.
     Agar 'Background Worker' bo'lsa ham, bu server zarar keltirmaydi."""
@@ -5989,38 +6024,17 @@ async def _run_health_server():
 
     app.router.add_get("/", health)
 
-    # ── 🏆 Yutuqli o'yin Web App uchun balans API ──
-    # Web App sahifasi shu endpoint orqali foydalanuvchining bot bazasidagi
-    # HAQIQIY balansini oladi (bot profilidagi balans bilan bir xil, birlashgan).
-    async def webapp_api_me(request: web.Request):
-        init_data = request.query.get("initData", "")
-        verified = verify_webapp_init_data(init_data, BOT_TOKEN or "")
-        if not verified or not verified.get("user"):
-            return web.json_response({"error": "unauthorized"}, status=401)
-        tg_user = verified["user"]
-        uid = tg_user.get("id")
-        if not uid:
-            return web.json_response({"error": "unauthorized"}, status=401)
-        await upsert_user(uid, tg_user.get("username", ""))
-        u = await get_user(uid)
-        lang = (u or {}).get("lang", "uz")
-        balance = (u or {}).get("balance", 0)
-        return web.json_response({
-            "user_id": uid,
-            "username": (u or {}).get("username") or tg_user.get("username") or "",
-            "first_name": tg_user.get("first_name", ""),
-            "last_name": tg_user.get("last_name", ""),
-            "photo_url": tg_user.get("photo_url", ""),
-            "balance": balance,
-            "balance_str": await format_money(balance, lang),
-            "total_deposited": (u or {}).get("total_deposited", 0),
-        })
-
+    # 🏆 Yutuqli o'yin uchun REAL balansni backend bilan sinxron ushlab turadigan API'lar.
+    # Bular bo'lmasa, webapp faqat brauzer xotirasidagi vaqtinchalik son bilan ishlaydi
+    # va real balansga hech qanday ta'sir qilmaydi.
     app.router.add_get("/webapp/api/me", webapp_api_me)
+    app.router.add_post("/webapp/api/bet", webapp_api_bet)
+    app.router.add_post("/webapp/api/cashout", webapp_api_cashout)
+    app.router.add_route("OPTIONS", "/webapp/api/me", webapp_api_options)
+    app.router.add_route("OPTIONS", "/webapp/api/bet", webapp_api_options)
+    app.router.add_route("OPTIONS", "/webapp/api/cashout", webapp_api_options)
 
     # 🏆 Yutuqli o'yin uchun Web App fayllarini xizmat qilish (webapp/index.html)
-    # Eslatma: statik fayllar API'dan KEYIN ro'yxatdan o'tkaziladi, aks holda
-    # '/webapp/api/me' so'rovi statik handlerga tushib qolishi mumkin edi.
     webapp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
     if os.path.isdir(webapp_dir):
         app.router.add_static("/webapp/", webapp_dir, show_index=False)
