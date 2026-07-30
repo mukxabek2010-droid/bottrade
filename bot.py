@@ -5020,12 +5020,11 @@ async def ub_resend_sms(cb: types.CallbackQuery, state: FSMContext):
         await cb.answer("Sessiya tugagan, qaytadan boshlang.", show_alert=True)
         return
     try:
-        # force_sms endi Telethon'da ishlamaydi (deprecated).
-        # phone_code_hash bilan qayta so'ralsa, Telegram o'zi navbatdagi
-        # usulni (SMS/Call/App) avtomatik tanlaydi.
-        sent = await pend["client"].send_code_request(
-            pend["phone"], phone_code_hash=pend["phone_code_hash"]
-        )
+        # Telethon phone_code_hash'ni client ichida o'zi keshlab saqlaydi,
+        # shuning uchun uni qo'lda uzatish kerak emas (va bunday parametr
+        # send_code_request() da umuman mavjud emas). Oddiy qayta chaqiruv
+        # avtomatik ravishda ResendCodeRequest so'rovini yuboradi.
+        sent = await pend["client"].send_code_request(pend["phone"])
         pend["phone_code_hash"] = sent.phone_code_hash
         type_name = type(sent.type).__name__
         if "Sms" in type_name:
