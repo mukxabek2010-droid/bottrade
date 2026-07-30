@@ -1194,7 +1194,12 @@ def main_kb(lang="uz"):
     b.button(text="🤖 AI Yordamchi")
     b.button(text=T(lang, "btn_pro_menu"))
     if WEBAPP_URL:
-        b.button(text=T(lang, "btn_game"), web_app=WebAppInfo(url=WEBAPP_URL))
+        # Eslatma: bu yerda ATAYLAB oddiy matnli tugma qo'yilgan (web_app emas).
+        # Reply-klaviaturadagi web_app tugmasi ba'zi Telegram mijozlarida
+        # initData'ni ishonchli uzatmaydi. Shuning uchun bosilganda pastdagi
+        # cmd_game_open handleri ishga tushib, INLINE web_app tugmasi bilan
+        # Web App'ni ochadi — bu barcha platformada ishonchli ishlaydi.
+        b.button(text=T(lang, "btn_game"))
     else:
         b.button(text=T(lang, "btn_game"))
     b.button(text=T(lang, "btn_change_lang"))
@@ -4476,6 +4481,20 @@ async def cmd_game_not_configured(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
     await msg.answer("⚙️ Web App manzili hali sozlanmagan. Iltimos, admin bilan bog'laning.")
+
+
+@dp.message(F.func(lambda msg: bool(WEBAPP_URL) and any(msg.text == T(l, "btn_game") for l in LANGS)))
+async def cmd_game_open(msg: types.Message, state: FSMContext):
+    """Web App'ni INLINE tugma orqali ochadi (reply-klaviatura o'rniga) — bu
+    barcha Telegram mijozlarida (mobil, desktop) foydalanuvchi ma'lumotlari
+    (initData: id, ism, rasm) ishonchli uzatilishini ta'minlaydi."""
+    if not await check_access(msg, state):
+        return
+    lang = await get_user_lang(msg.from_user.id)
+    b = InlineKeyboardBuilder()
+    b.button(text=T(lang, "btn_game"), web_app=WebAppInfo(url=WEBAPP_URL))
+    b.adjust(1)
+    await msg.answer("🏆 Yutuqli o'yinni ochish uchun tugmani bosing:", reply_markup=b.as_markup())
 
 # ═══════════════════════════════════════════════════════
 # 🎁 REFERAL BO'LIMI
