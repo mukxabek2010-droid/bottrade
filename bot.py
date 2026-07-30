@@ -459,25 +459,31 @@ def verify_init_data(init_data: str):
     """Telegram Web App yuborgan initData'ni tekshiradi (rasmiy Telegram algoritmi bo'yicha)
     va ichidagi foydalanuvchi ma'lumotini qaytaradi. Soxta/o'zgartirilgan bo'lsa None qaytaradi."""
     if not init_data or not BOT_TOKEN:
+        logging.warning("verify_init_data: initData yoki BOT_TOKEN bo'sh")
         return None
     try:
-        parsed = dict(parse_qsl(init_data, strict_parsing=True))
-    except ValueError:
+        parsed = dict(parse_qsl(init_data, keep_blank_values=True))
+    except Exception as e:
+        logging.warning(f"verify_init_data: initData parse xatosi: {e}")
         return None
     received_hash = parsed.pop("hash", None)
     if not received_hash:
+        logging.warning("verify_init_data: 'hash' maydoni topilmadi")
         return None
     data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
     secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
     calc_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
     if not hmac.compare_digest(calc_hash, received_hash):
+        logging.warning("verify_init_data: hash mos kelmadi (BOT_TOKEN noto'g'ri bo'lishi mumkin)")
         return None
     user_raw = parsed.get("user")
     if not user_raw:
+        logging.warning("verify_init_data: 'user' maydoni topilmadi")
         return None
     try:
         return json.loads(user_raw)
-    except Exception:
+    except Exception as e:
+        logging.warning(f"verify_init_data: 'user' JSON parse xatosi: {e}")
         return None
 
 async def get_user(uid):
