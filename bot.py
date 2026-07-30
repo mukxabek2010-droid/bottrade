@@ -10,6 +10,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher, types, F
+from aiogram.types import WebAppInfo
 from aiogram.filters import Command
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -46,6 +47,11 @@ CARD_NUMBER       = os.getenv("CARD_NUMBER", "9860080394103636")
 CARD_OWNER        = os.getenv("CARD_OWNER", "Mashrapova.D")
 CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_chat_veko")
 ROBLOX_SCRIPT_CHANNEL = os.getenv("ROBLOX_SCRIPT_CHANNEL", "https://t.me/deltascriptuz")
+
+# ── Yutuqli o'yin (Telegram Web App) ──
+# Render'da avtomatik beriladigan tashqi manzil (masalan: https://mybot.onrender.com)
+_RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL", "").rstrip("/")
+WEBAPP_URL = os.getenv("WEBAPP_URL") or (f"{_RENDER_EXTERNAL_URL}/webapp/index.html" if _RENDER_EXTERNAL_URL else "")
 
 # ── AI Yordamchi (foydalanuvchi Telegram akkauntini ulash) uchun ──
 # my.telegram.org saytidan olinadigan API ma'lumotlari (.env ga qo'shiladi)
@@ -172,6 +178,7 @@ LANGS = {
         "btn_suggest": "💡 Taklif berish",
         "btn_search": "🔍 Qidiruv",
         "btn_referral": "🎁 Referal",
+        "btn_game": "🏆 Yutuqli o'yin",
         "btn_change_lang": "🌐 Tilni o'zgartirish",
         "btn_bloxfruit": "🍈 Blox Fruit",
         "sub_msg": "👋 Salom! Botdan foydalanish uchun avval quyidagi kanallarga obuna bo'ling!",
@@ -250,6 +257,7 @@ LANGS = {
         "btn_suggest": "💡 Suggestion",
         "btn_search": "🔍 Search",
         "btn_referral": "🎁 Referral",
+        "btn_game": "🏆 Lucky Game",
         "btn_change_lang": "🌐 Change Language",
         "btn_bloxfruit": "🍈 Blox Fruit",
         "sub_msg": "👋 Hello! Please subscribe to all channels to use the bot!",
@@ -328,6 +336,7 @@ LANGS = {
         "btn_suggest": "💡 Предложение",
         "btn_search": "🔍 Поиск",
         "btn_referral": "🎁 Реферал",
+        "btn_game": "🏆 Игра на удачу",
         "btn_change_lang": "🌐 Сменить язык",
         "btn_bloxfruit": "🍈 Blox Fruit",
         "sub_msg": "👋 Привет! Подпишитесь на все каналы, чтобы использовать бот!",
@@ -1149,14 +1158,17 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_admin_service"))
     b.button(text=T(lang, "btn_suggest"))
     b.button(text=T(lang, "btn_search"))
-    b.button(text=T(lang, "btn_referral"))
     b.button(text=T(lang, "btn_roblox_script"))
     b.button(text=T(lang, "btn_proofs"))
     b.button(text=T(lang, "btn_bloxfruit"))
     b.button(text="🤖 AI Yordamchi")
     b.button(text=T(lang, "btn_pro_menu"))
+    if WEBAPP_URL:
+        b.button(text=T(lang, "btn_game"), web_app=WebAppInfo(url=WEBAPP_URL))
+    else:
+        b.button(text=T(lang, "btn_game"))
     b.button(text=T(lang, "btn_change_lang"))
-    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 1)
+    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 1)
     return b.as_markup(resize_keyboard=True)
 
 def _as_user_msg(cb: types.CallbackQuery) -> types.Message:
@@ -4405,6 +4417,15 @@ async def adm_deladmin(cb: types.CallbackQuery):
     await _render_admins_list(cb.message)
 
 # ═══════════════════════════════════════════════════════
+# 🏆 YUTUQLI O'YIN (Web App) — WEBAPP_URL sozlanmagan holat uchun fallback
+# ═══════════════════════════════════════════════════════
+@dp.message(F.func(lambda msg: (not WEBAPP_URL) and any(msg.text == T(l, "btn_game") for l in LANGS)))
+async def cmd_game_not_configured(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    await msg.answer("⚙️ Web App manzili hali sozlanmagan. Iltimos, admin bilan bog'laning.")
+
+# ═══════════════════════════════════════════════════════
 # 🎁 REFERAL BO'LIMI
 # ═══════════════════════════════════════════════════════
 @dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_referral") for l in LANGS)))
@@ -5896,6 +5917,14 @@ async def _run_health_server():
         return web.Response(text="OK - bot ishlayapti (polling)")
 
     app.router.add_get("/", health)
+    # 🏆 Yutuqli o'yin uchun Web App fayllarini xizmat qilish (webapp/index.html)
+    webapp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
+    if os.path.isdir(webapp_dir):
+        app.router.add_static("/webapp/", webapp_dir, show_index=False)
+        logging.info(f"🏆 Web App statik fayllari ulandi: {webapp_dir}")
+    else:
+        logging.warning(f"⚠️ 'webapp' papkasi topilmadi: {webapp_dir}")
+
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, host="0.0.0.0", port=WEB_PORT)
