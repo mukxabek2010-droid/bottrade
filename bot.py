@@ -1,8 +1,11 @@
 import os
 import asyncio
 import logging
+import base64
+import hashlib
 import requests
-from datetime import datetime
+from io import BytesIO
+from datetime import datetime, timedelta
 from motor.motor_asyncio import AsyncIOMotorClient
 from bson import ObjectId
 from dotenv import load_dotenv
@@ -15,6 +18,16 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from aiogram.client.default import DefaultBotProperties
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
+
+# ── AI Yordamchi (userbot) uchun qo'shimcha kutubxonalar ──
+from cryptography.fernet import Fernet
+from telethon import TelegramClient, events
+from telethon.sessions import StringSession
+from telethon.errors import (
+    SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError,
+    PasswordHashInvalidError, FloodWaitError, PhoneNumberInvalidError,
+)
+from telethon.tl.types import Channel, Chat, InputPeerChannel
 
 
 load_dotenv()
@@ -32,6 +45,22 @@ CARD_NUMBER       = os.getenv("CARD_NUMBER", "9860080394103636")
 CARD_OWNER        = os.getenv("CARD_OWNER", "Mashrapova.D")
 CHAT_LINK         = os.getenv("CHAT_LINK", "https://t.me/roblox_chat_veko")
 ROBLOX_SCRIPT_CHANNEL = os.getenv("ROBLOX_SCRIPT_CHANNEL", "https://t.me/deltascriptuz")
+
+# ── AI Yordamchi (foydalanuvchi Telegram akkauntini ulash) uchun ──
+# my.telegram.org saytidan olinadigan API ma'lumotlari (.env ga qo'shiladi)
+TELETHON_API_ID   = int(os.getenv("TELETHON_API_ID", "0") or "0")
+TELETHON_API_HASH = os.getenv("TELETHON_API_HASH", "")
+# Session'larni shifrlash uchun kalit. .env ga SESSION_ENCRYPT_KEY qo'ymasa,
+# BOT_TOKEN asosida barqaror (lekin kamroq xavfsiz) kalit hosil qilinadi.
+_SESSION_KEY_SOURCE = os.getenv("SESSION_ENCRYPT_KEY") or BOT_TOKEN or "veko_fallback_key"
+_FERNET_KEY = base64.urlsafe_b64encode(hashlib.sha256(_SESSION_KEY_SOURCE.encode()).digest())
+FERNET = Fernet(_FERNET_KEY)
+
+def encrypt_session(s: str) -> str:
+    return FERNET.encrypt(s.encode()).decode()
+
+def decrypt_session(s: str) -> str:
+    return FERNET.decrypt(s.encode()).decode()
 
 ADMIN_IDS = {8866852203, 7405798326}
 
@@ -348,6 +377,11 @@ admins_col     = mdb["admins"]
 duels          = mdb["duels"]
 settings_col   = mdb["settings"]
 
+# ── AI Yordamchi uchun kolleksiyalar ──
+userbot_accounts   = mdb["userbot_accounts"]    # ulangan shaxsiy akkauntlar (session'lar shifrlangan holda)
+autoreply_col      = mdb["autoreply_settings"]  # avto javob sozlamalari
+autobroadcast_col  = mdb["autobroadcast"]       # avto xabar (kanallarga davriy yuborish) sozlamalari
+
 async def init_indexes():
     await users.create_index("user_id", unique=True)
     await deposits.create_index("user_id")
@@ -360,6 +394,9 @@ async def init_indexes():
     await online_traders.create_index("user_id", unique=True)
     await mutes_db.create_index("user_id", unique=True)
     await pending_refs_db.create_index("user_id", unique=True)
+    await userbot_accounts.create_index("user_id", unique=True)
+    await autoreply_col.create_index("user_id", unique=True)
+    await autobroadcast_col.create_index("user_id")
 
 # ═══════════════════════════════════════════════════════
 # HELPERS
@@ -1090,8 +1127,9 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_roblox_script"))
     b.button(text=T(lang, "btn_proofs"))
     b.button(text=T(lang, "btn_bloxfruit"))
+    b.button(text="🤖 AI Yordamchi")
     b.button(text=T(lang, "btn_change_lang"))
-    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2)
+    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1)
     return b.as_markup(resize_keyboard=True)
 
 def cancel_kb(lang="uz"):
@@ -4711,6 +4749,736 @@ async def cmd_proofs(msg: types.Message, state: FSMContext):
     )
 
 # ═══════════════════════════════════════════════════════
+# 🤖 AI YORDAMCHI (shaxsiy Telegram akkauntini ulash orqali
+# avto javob va avto xabar tizimi) — Telethon asosida
+# ═══════════════════════════════════════════════════════
+
+# ── FSM holatlari ──
+class UserbotConnect(StatesGroup):
+    phone    = State()
+    code     = State()
+    password = State()
+
+class AutoReplySetup(StatesGroup):
+    photo      = State()
+    gifsticker = State()
+    text       = State()
+
+class AutoBroadcastSetup(StatesGroup):
+    content        = State()
+    interval_unit  = State()
+    interval_value = State()
+
+# Login jarayonida vaqtinchalik Telethon client'lar (xotirada, DB'ga yozilmaydi)
+PENDING_LOGIN: dict[int, dict] = {}
+# Avto javobda spam/loop bo'lmasligi uchun tashqi cooldown: {(owner_uid, sender_id): last_ts}
+REPLY_THROTTLE: dict[tuple, float] = {}
+REPLY_THROTTLE_SECONDS = 6 * 3600  # bir xil odamga 6 soatda bir marta avto javob
+
+
+async def download_bytes(file_id: str) -> bytes:
+    """Aiogram bot orqali faylni yuklab, xotiradagi bayt sifatida qaytaradi
+    (Telethon'ga qayta yuklash uchun, chunki Bot API file_id userbot'da ishlamaydi)."""
+    buf = await bot.download(file_id)
+    return buf.read()
+
+
+# ── Userbot (Telethon) menejeri ──
+class UserbotManager:
+    def __init__(self):
+        self.clients: dict[int, TelegramClient] = {}
+
+    def get_client(self, uid: int):
+        return self.clients.get(uid)
+
+    async def stop_client_for_user(self, uid: int):
+        client = self.clients.pop(uid, None)
+        if client:
+            try:
+                await client.disconnect()
+            except Exception:
+                pass
+
+    async def start_client_for_user(self, uid: int, session_str: str):
+        await self.stop_client_for_user(uid)
+        try:
+            client = TelegramClient(StringSession(session_str), TELETHON_API_ID, TELETHON_API_HASH)
+            await client.connect()
+            if not await client.is_user_authorized():
+                logging.warning(f"⚠️ Userbot {uid}: sessiya avtorizatsiyadan o'tmagan, o'chirib qo'yildi.")
+                await client.disconnect()
+                await userbot_accounts.delete_one({"user_id": uid})
+                return None
+            client.add_event_handler(self._make_autoreply_handler(uid), events.NewMessage(incoming=True))
+            self.clients[uid] = client
+            logging.info(f"✅ Userbot ishga tushdi: {uid}")
+            return client
+        except Exception as e:
+            logging.error(f"Userbot ulanmadi ({uid}): {e}")
+            return None
+
+    def _make_autoreply_handler(self, uid: int):
+        async def handler(event):
+            try:
+                if not event.is_private:
+                    return
+                sender = await event.get_sender()
+                if sender is None or getattr(sender, "bot", False):
+                    return
+                settings = await autoreply_col.find_one({"user_id": uid, "enabled": True})
+                if not settings:
+                    return
+                key = (uid, event.sender_id)
+                last = REPLY_THROTTLE.get(key, 0)
+                if datetime.now().timestamp() - last < REPLY_THROTTLE_SECONDS:
+                    return
+                REPLY_THROTTLE[key] = datetime.now().timestamp()
+                client = self.clients.get(uid)
+                if not client:
+                    return
+                if settings.get("photo_b64"):
+                    bio = BytesIO(base64.b64decode(settings["photo_b64"]))
+                    bio.name = "photo.jpg"
+                    await client.send_file(event.chat_id, bio)
+                if settings.get("media_b64"):
+                    kind = settings.get("media_kind", "animation")
+                    bio = BytesIO(base64.b64decode(settings["media_b64"]))
+                    bio.name = "sticker.webp" if kind == "sticker" else "gif.mp4"
+                    await client.send_file(event.chat_id, bio)
+                if settings.get("text"):
+                    await client.send_message(event.chat_id, settings["text"])
+            except Exception as e:
+                logging.error(f"Avto javob xatosi ({uid}): {e}")
+        return handler
+
+    async def restart_all(self):
+        async for acc in userbot_accounts.find({}):
+            try:
+                session_str = decrypt_session(acc["session_enc"])
+                await self.start_client_for_user(acc["user_id"], session_str)
+            except Exception as e:
+                logging.error(f"Userbot qayta ulanmadi ({acc.get('user_id')}): {e}")
+
+
+userbot_manager = UserbotManager()
+
+
+async def _cleanup_pending_login(uid: int):
+    pend = PENDING_LOGIN.pop(uid, None)
+    if pend:
+        try:
+            await pend["client"].disconnect()
+        except Exception:
+            pass
+
+
+async def _finish_login(msg: types.Message, state: FSMContext, uid: int):
+    lang = await get_user_lang(uid)
+    pend = PENDING_LOGIN.pop(uid, None)
+    if not pend:
+        await state.clear()
+        return
+    client = pend["client"]
+    session_str = client.session.save()
+    try:
+        await client.disconnect()
+    except Exception:
+        pass
+    await userbot_accounts.update_one(
+        {"user_id": uid},
+        {"$set": {
+            "user_id": uid, "phone": pend["phone"],
+            "session_enc": encrypt_session(session_str), "connected_at": now(),
+        }},
+        upsert=True
+    )
+    await userbot_manager.start_client_for_user(uid, session_str)
+    await state.clear()
+    await msg.answer("✅ Akkaunt muvaffaqiyatli ulandi!", reply_markup=main_kb(lang))
+    await show_ai_menu(msg.chat.id, uid)
+
+
+async def show_ai_menu(chat_id: int, uid: int):
+    acc = await userbot_accounts.find_one({"user_id": uid})
+    b = InlineKeyboardBuilder()
+    if not acc:
+        b.button(text="🔗 Akkaunt ulash", callback_data="ub_connect")
+        b.adjust(1)
+        text = (
+            "🤖 *AI Yordamchi*\n\n"
+            "Bu bo'limda shaxsiy Telegram akkauntingizni ulab:\n"
+            "🔁 Yozgan odamlarga *avto javob* berishni,\n"
+            "📢 Kanallaringizga *avto xabar* yuborishni sozlashingiz mumkin.\n\n"
+            "⚠️ Davom etish uchun avval akkauntingizni ulang:"
+        )
+    else:
+        b.button(text="🔁 Avto javob", callback_data="ar_menu")
+        b.button(text="📢 Avto xabar", callback_data="bc_menu")
+        b.button(text="🔌 Akkauntni uzish", callback_data="ub_disconnect")
+        b.adjust(2, 1)
+        text = (
+            f"🤖 *AI Yordamchi*\n\n✅ Ulangan akkaunt: `{esc_md(acc.get('phone',''))}`\n\n"
+            "Kerakli bo'limni tanlang:"
+        )
+    await bot.send_message(chat_id, text, reply_markup=b.as_markup())
+
+
+@dp.message(F.text == "🤖 AI Yordamchi")
+async def cmd_ai_yordamchi(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    await show_ai_menu(msg.chat.id, msg.from_user.id)
+
+
+@dp.callback_query(F.data == "ai_back")
+async def ai_back(cb: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    await show_ai_menu(cb.message.chat.id, cb.from_user.id)
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "generic_cancel")
+async def generic_cancel(cb: types.CallbackQuery, state: FSMContext):
+    lang = await get_user_lang(cb.from_user.id)
+    await state.clear()
+    await cb.message.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+    await cb.answer()
+
+
+# ── Akkauntni ulash (telefon raqami orqali) ──
+@dp.callback_query(F.data == "ub_connect")
+async def ub_connect_start(cb: types.CallbackQuery, state: FSMContext):
+    if not TELETHON_API_ID or not TELETHON_API_HASH:
+        await cb.answer("⚠️ TELETHON_API_ID / TELETHON_API_HASH sozlanmagan (.env)!", show_alert=True)
+        return
+    lang = await get_user_lang(cb.from_user.id)
+    await cb.message.answer(
+        "📱 Telegram akkauntingiz raqamini xalqaro formatda yuboring.\n"
+        "Masalan: `+998901234567`",
+        reply_markup=cancel_kb(lang)
+    )
+    await state.set_state(UserbotConnect.phone)
+    await cb.answer()
+
+
+@dp.message(UserbotConnect.phone)
+async def ub_got_phone(msg: types.Message, state: FSMContext):
+    uid, lang = msg.from_user.id, await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    phone = (msg.text or "").strip().replace(" ", "")
+    if not phone.startswith("+") or not phone[1:].isdigit() or len(phone) < 8:
+        await msg.answer("❌ Raqam noto'g'ri formatda. Masalan: +998901234567\nQaytadan yuboring:")
+        return
+    wait_msg = await msg.answer("⏳ Kod yuborilmoqda...")
+    client = TelegramClient(StringSession(), TELETHON_API_ID, TELETHON_API_HASH)
+    try:
+        await client.connect()
+        sent = await client.send_code_request(phone)
+    except FloodWaitError as e:
+        await wait_msg.edit_text(f"❌ Juda ko'p urinish qilindi. {e.seconds} soniyadan keyin qaytadan urining.")
+        await state.clear()
+        return
+    except PhoneNumberInvalidError:
+        await wait_msg.edit_text("❌ Bu raqam noto'g'ri. Qaytadan urinib ko'ring.")
+        await state.clear()
+        return
+    except Exception as e:
+        logging.error(f"send_code_request xatosi: {e}")
+        await wait_msg.edit_text("❌ Xatolik yuz berdi, birozdan keyin qaytadan urinib ko'ring.")
+        await state.clear()
+        return
+    PENDING_LOGIN[uid] = {"client": client, "phone": phone, "phone_code_hash": sent.phone_code_hash}
+    await wait_msg.edit_text("🔑 Telegramdan kelgan kodni kiriting:")
+    await state.set_state(UserbotConnect.code)
+
+
+@dp.message(UserbotConnect.code)
+async def ub_got_code(msg: types.Message, state: FSMContext):
+    uid, lang = msg.from_user.id, await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await _cleanup_pending_login(uid)
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    pend = PENDING_LOGIN.get(uid)
+    if not pend:
+        await state.clear()
+        await msg.answer("❌ Sessiya tugagan, qaytadan boshlang.", reply_markup=main_kb(lang))
+        return
+    code = (msg.text or "").strip().replace(" ", "")
+    client = pend["client"]
+    try:
+        await client.sign_in(phone=pend["phone"], code=code, phone_code_hash=pend["phone_code_hash"])
+    except SessionPasswordNeededError:
+        await msg.answer("🔒 Akkauntingizda 2 bosqichli parol yoqilgan. Parolni kiriting:")
+        await state.set_state(UserbotConnect.password)
+        return
+    except (PhoneCodeInvalidError, PhoneCodeExpiredError):
+        await msg.answer("❌ Kod noto'g'ri yoki muddati tugagan. Qaytadan kiriting:")
+        return
+    except Exception as e:
+        logging.error(f"sign_in xatosi: {e}")
+        await msg.answer("❌ Xatolik yuz berdi. Qaytadan urinib ko'ring (/start).")
+        await _cleanup_pending_login(uid)
+        await state.clear()
+        return
+    await _finish_login(msg, state, uid)
+
+
+@dp.message(UserbotConnect.password)
+async def ub_got_password(msg: types.Message, state: FSMContext):
+    uid, lang = msg.from_user.id, await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await _cleanup_pending_login(uid)
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    pend = PENDING_LOGIN.get(uid)
+    if not pend:
+        await state.clear()
+        await msg.answer("❌ Sessiya tugagan, qaytadan boshlang.", reply_markup=main_kb(lang))
+        return
+    try:
+        await pend["client"].sign_in(password=(msg.text or "").strip())
+    except PasswordHashInvalidError:
+        await msg.answer("❌ Parol noto'g'ri. Qaytadan kiriting:")
+        return
+    except Exception as e:
+        logging.error(f"2FA sign_in xatosi: {e}")
+        await msg.answer("❌ Xatolik yuz berdi. Qaytadan urinib ko'ring (/start).")
+        await _cleanup_pending_login(uid)
+        await state.clear()
+        return
+    await _finish_login(msg, state, uid)
+
+
+@dp.callback_query(F.data == "ub_disconnect")
+async def ub_disconnect(cb: types.CallbackQuery):
+    uid = cb.from_user.id
+    await userbot_manager.stop_client_for_user(uid)
+    await userbot_accounts.delete_one({"user_id": uid})
+    await autoreply_col.update_one({"user_id": uid}, {"$set": {"enabled": False}})
+    await autobroadcast_col.update_many({"user_id": uid}, {"$set": {"active": False}})
+    await cb.message.answer("🔌 Akkaunt uzildi.")
+    await cb.answer()
+
+
+# ── 🔁 AVTO JAVOB ──
+@dp.callback_query(F.data == "ar_menu")
+async def ar_menu(cb: types.CallbackQuery):
+    uid = cb.from_user.id
+    acc = await userbot_accounts.find_one({"user_id": uid})
+    if not acc:
+        await cb.answer("Avval akkaunt ulang!", show_alert=True)
+        return
+    settings = await autoreply_col.find_one({"user_id": uid})
+    b = InlineKeyboardBuilder()
+    if settings:
+        state_txt = "✅ Yoqilgan" if settings.get("enabled") else "🚫 O'chirilgan"
+        toggle_txt = "🚫 O'chirish" if settings.get("enabled") else "✅ Yoqish"
+        b.button(text="✏️ Qayta sozlash", callback_data="ar_setup_start")
+        b.button(text=toggle_txt, callback_data="ar_toggle")
+    else:
+        state_txt = "Sozlanmagan"
+        b.button(text="➕ Sozlash", callback_data="ar_setup_start")
+    b.button(text="⬅️ Orqaga", callback_data="ai_back")
+    b.adjust(1)
+    await cb.message.answer(f"🔁 *Avto javob*\n\nHolati: {state_txt}", reply_markup=b.as_markup())
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "ar_toggle")
+async def ar_toggle(cb: types.CallbackQuery):
+    uid = cb.from_user.id
+    settings = await autoreply_col.find_one({"user_id": uid})
+    if not settings:
+        await cb.answer("Avval sozlang!", show_alert=True)
+        return
+    new_val = not settings.get("enabled", False)
+    await autoreply_col.update_one({"user_id": uid}, {"$set": {"enabled": new_val}})
+    await cb.answer("✅ Yoqildi!" if new_val else "🚫 O'chirildi!")
+    await ar_menu(cb)
+
+
+@dp.callback_query(F.data == "ar_setup_start")
+async def ar_setup_start(cb: types.CallbackQuery, state: FSMContext):
+    lang = await get_user_lang(cb.from_user.id)
+    await state.update_data(ar_photo=None, ar_media=None, ar_media_kind=None)
+    await cb.message.answer("📸 Avto javobda ko'rsatiladigan rasm yuboring (ixtiyoriy):", reply_markup=skip_cancel_kb(lang))
+    await state.set_state(AutoReplySetup.photo)
+    await cb.answer()
+
+
+@dp.message(AutoReplySetup.photo, F.photo)
+async def ar_photo_got(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    raw = await download_bytes(msg.photo[-1].file_id)
+    await state.update_data(ar_photo=base64.b64encode(raw).decode())
+    await msg.answer("🎞 Endi GIF yoki stiker yuboring (ixtiyoriy):", reply_markup=skip_cancel_kb(lang))
+    await state.set_state(AutoReplySetup.gifsticker)
+
+
+@dp.message(AutoReplySetup.photo)
+async def ar_photo_skip(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    await msg.answer("🎞 Endi GIF yoki stiker yuboring (ixtiyoriy):", reply_markup=skip_cancel_kb(lang))
+    await state.set_state(AutoReplySetup.gifsticker)
+
+
+@dp.message(AutoReplySetup.gifsticker, F.animation)
+async def ar_anim_got(msg: types.Message, state: FSMContext):
+    raw = await download_bytes(msg.animation.file_id)
+    await state.update_data(ar_media=base64.b64encode(raw).decode(), ar_media_kind="animation")
+    await _ar_ask_text(msg, state)
+
+
+@dp.message(AutoReplySetup.gifsticker, F.sticker)
+async def ar_sticker_got(msg: types.Message, state: FSMContext):
+    raw = await download_bytes(msg.sticker.file_id)
+    await state.update_data(ar_media=base64.b64encode(raw).decode(), ar_media_kind="sticker")
+    await _ar_ask_text(msg, state)
+
+
+@dp.message(AutoReplySetup.gifsticker)
+async def ar_gifsticker_skip(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    await _ar_ask_text(msg, state)
+
+
+async def _ar_ask_text(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    await msg.answer("📝 Endi avto javob matnini yozing (bu qism *majburiy*):", reply_markup=cancel_kb(lang))
+    await state.set_state(AutoReplySetup.text)
+
+
+@dp.message(AutoReplySetup.text)
+async def ar_text_got(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    text = (msg.text or "").strip()
+    if not text:
+        await msg.answer("❌ Matn bo'sh bo'lmasin, qaytadan yozing:")
+        return
+    await state.update_data(ar_text=text)
+    d = await state.get_data()
+    b = InlineKeyboardBuilder()
+    b.button(text="✅ Tasdiqlash", callback_data="ar_confirm")
+    b.button(text="❌ Bekor qilish", callback_data="generic_cancel")
+    b.adjust(2)
+    preview = []
+    if d.get("ar_photo"):
+        preview.append("📸 Rasm: bor")
+    if d.get("ar_media"):
+        preview.append(f"🎞 Media: bor ({d.get('ar_media_kind')})")
+    preview.append(f"📝 Matn: {esc_md(text)}")
+    await msg.answer("👀 *Ko'rib chiqing:*\n\n" + "\n".join(preview), reply_markup=b.as_markup())
+
+
+@dp.callback_query(F.data == "ar_confirm")
+async def ar_confirm(cb: types.CallbackQuery, state: FSMContext):
+    uid, lang = cb.from_user.id, await get_user_lang(cb.from_user.id)
+    d = await state.get_data()
+    await autoreply_col.update_one(
+        {"user_id": uid},
+        {"$set": {
+            "user_id": uid,
+            "photo_b64": d.get("ar_photo"),
+            "media_b64": d.get("ar_media"),
+            "media_kind": d.get("ar_media_kind"),
+            "text": d.get("ar_text", ""),
+            "enabled": True,
+            "updated_at": now(),
+        }},
+        upsert=True
+    )
+    await state.clear()
+    await cb.message.answer("✅ Avto javob sozlandi va yoqildi!", reply_markup=main_kb(lang))
+    await cb.answer()
+
+
+# ── 📢 AVTO XABAR ──
+@dp.callback_query(F.data == "bc_menu")
+async def bc_menu(cb: types.CallbackQuery):
+    uid = cb.from_user.id
+    acc = await userbot_accounts.find_one({"user_id": uid})
+    if not acc:
+        await cb.answer("Avval akkaunt ulang!", show_alert=True)
+        return
+    configs = await autobroadcast_col.find({"user_id": uid}).to_list(length=20)
+    b = InlineKeyboardBuilder()
+    b.button(text="➕ Yangi avto xabar", callback_data="bc_new")
+    for c in configs:
+        status = "✅" if c.get("active") else "🚫"
+        titles = ", ".join(ch["title"] for ch in c.get("channels", [])[:2]) or "kanal"
+        b.button(text=f"{status} {titles}", callback_data=f"bc_view_{c['_id']}")
+    b.button(text="⬅️ Orqaga", callback_data="ai_back")
+    b.adjust(1)
+    await cb.message.answer("📢 *Avto xabar*\n\nMavjud sozlamalar yoki yangisini qo'shing:", reply_markup=b.as_markup())
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("bc_view_"))
+async def bc_view(cb: types.CallbackQuery):
+    cid = cb.data[len("bc_view_"):]
+    cfg = await autobroadcast_col.find_one({"_id": ObjectId(cid)})
+    if not cfg or cfg["user_id"] != cb.from_user.id:
+        await cb.answer("Topilmadi!", show_alert=True)
+        return
+    titles = "\n".join(f"• {esc_md(ch['title'])}" for ch in cfg.get("channels", []))
+    interval = cfg.get("interval_seconds", 0)
+    interval_txt = f"{interval // 3600} soat" if interval % 3600 == 0 and interval >= 3600 else f"{interval // 60} daqiqa"
+    status = "✅ Faol" if cfg.get("active") else "🚫 To'xtatilgan"
+    b = InlineKeyboardBuilder()
+    toggle_txt = "🛑 To'xtatish" if cfg.get("active") else "▶️ Qayta yoqish"
+    b.button(text=toggle_txt, callback_data=f"bc_toggle_{cid}")
+    b.button(text="🗑 O'chirish", callback_data=f"bc_del_{cid}")
+    b.button(text="⬅️ Orqaga", callback_data="bc_menu")
+    b.adjust(1)
+    await cb.message.answer(
+        f"📢 *Avto xabar sozlamasi*\n\nHolati: {status}\n⏱ Interval: {interval_txt}\n\nKanallar:\n{titles}",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("bc_toggle_"))
+async def bc_toggle(cb: types.CallbackQuery):
+    cid = cb.data[len("bc_toggle_"):]
+    cfg = await autobroadcast_col.find_one({"_id": ObjectId(cid)})
+    if not cfg or cfg["user_id"] != cb.from_user.id:
+        await cb.answer("Topilmadi!", show_alert=True)
+        return
+    new_active = not cfg.get("active", False)
+    update = {"active": new_active}
+    if new_active:
+        update["next_run"] = datetime.now() + timedelta(seconds=cfg["interval_seconds"])
+    await autobroadcast_col.update_one({"_id": cfg["_id"]}, {"$set": update})
+    await cb.answer("✅ Yoqildi!" if new_active else "🚫 To'xtatildi!")
+    await bc_view(cb)
+
+
+@dp.callback_query(F.data.startswith("bc_del_"))
+async def bc_del(cb: types.CallbackQuery):
+    cid = cb.data[len("bc_del_"):]
+    cfg = await autobroadcast_col.find_one({"_id": ObjectId(cid)})
+    if not cfg or cfg["user_id"] != cb.from_user.id:
+        await cb.answer("Topilmadi!", show_alert=True)
+        return
+    await autobroadcast_col.delete_one({"_id": cfg["_id"]})
+    await cb.answer("🗑 O'chirildi!")
+    try:
+        await cb.message.edit_text("🗑 O'chirildi.")
+    except Exception:
+        pass
+
+
+@dp.callback_query(F.data == "bc_new")
+async def bc_new(cb: types.CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    client = userbot_manager.get_client(uid)
+    if not client:
+        await cb.answer("Akkaunt ulanmagan yoki offline!", show_alert=True)
+        return
+    await cb.answer("⏳ Kanallar yuklanmoqda...")
+    channels = []
+    async for dialog in client.iter_dialogs(limit=100):
+        ent = dialog.entity
+        if isinstance(ent, Channel) or isinstance(ent, Chat):
+            channels.append({"id": ent.id, "access_hash": getattr(ent, "access_hash", 0), "title": dialog.title})
+    if not channels:
+        await cb.message.answer("❌ Hech qanday kanal yoki guruh topilmadi.")
+        return
+    await state.update_data(bc_all_channels=channels, bc_selected=[])
+    await _render_channel_picker(cb.message, state)
+
+
+async def _render_channel_picker(msg: types.Message, state: FSMContext):
+    d = await state.get_data()
+    all_ch = d.get("bc_all_channels", [])
+    selected = set(d.get("bc_selected", []))
+    b = InlineKeyboardBuilder()
+    for i, ch in enumerate(all_ch[:30]):
+        mark = "✅ " if ch["id"] in selected else ""
+        b.button(text=f"{mark}{ch['title'][:30]}", callback_data=f"bc_pick_{i}")
+    b.button(text="➡️ Davom etish", callback_data="bc_pick_done")
+    b.button(text="❌ Bekor qilish", callback_data="generic_cancel")
+    b.adjust(1)
+    await msg.answer(f"📢 Kanallarni tanlang ({len(selected)} ta tanlandi):", reply_markup=b.as_markup())
+
+
+@dp.callback_query(F.data == "bc_pick_done")
+async def bc_pick_done(cb: types.CallbackQuery, state: FSMContext):
+    d = await state.get_data()
+    selected_ids = set(d.get("bc_selected", []))
+    if not selected_ids:
+        await cb.answer("Kamida 1 ta kanal tanlang!", show_alert=True)
+        return
+    all_ch = d.get("bc_all_channels", [])
+    chosen = [c for c in all_ch if c["id"] in selected_ids]
+    await state.update_data(bc_chosen=chosen)
+    lang = await get_user_lang(cb.from_user.id)
+    await cb.message.answer("✍️ Yubormoqchi bo'lgan xabaringizni yuboring (matn, rasm, video va h.k.):", reply_markup=cancel_kb(lang))
+    await state.set_state(AutoBroadcastSetup.content)
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("bc_pick_"))
+async def bc_pick(cb: types.CallbackQuery, state: FSMContext):
+    idx_str = cb.data[len("bc_pick_"):]
+    if not idx_str.isdigit():
+        await cb.answer()
+        return
+    idx = int(idx_str)
+    d = await state.get_data()
+    all_ch = d.get("bc_all_channels", [])
+    selected = list(d.get("bc_selected", []))
+    if idx >= len(all_ch):
+        await cb.answer()
+        return
+    ch_id = all_ch[idx]["id"]
+    if ch_id in selected:
+        selected.remove(ch_id)
+    else:
+        selected.append(ch_id)
+    await state.update_data(bc_selected=selected)
+    await cb.answer()
+    await _render_channel_picker(cb.message, state)
+
+
+@dp.message(AutoBroadcastSetup.content)
+async def bc_content_got(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    content = None
+    if msg.photo:
+        raw = await download_bytes(msg.photo[-1].file_id)
+        content = {"type": "photo", "media_b64": base64.b64encode(raw).decode(), "filename": "photo.jpg", "caption": msg.caption or ""}
+    elif msg.video:
+        raw = await download_bytes(msg.video.file_id)
+        content = {"type": "video", "media_b64": base64.b64encode(raw).decode(), "filename": "video.mp4", "caption": msg.caption or ""}
+    elif msg.animation:
+        raw = await download_bytes(msg.animation.file_id)
+        content = {"type": "animation", "media_b64": base64.b64encode(raw).decode(), "filename": "anim.mp4", "caption": msg.caption or ""}
+    elif msg.text:
+        content = {"type": "text", "text": msg.text}
+    else:
+        await msg.answer("❌ Bu turdagi xabar qo'llab-quvvatlanmaydi. Matn, rasm yoki video yuboring:")
+        return
+    await state.update_data(bc_content=content)
+    b = InlineKeyboardBuilder()
+    b.button(text="⏱ Daqiqa", callback_data="bc_unit_min")
+    b.button(text="🕐 Soat", callback_data="bc_unit_hour")
+    b.adjust(2)
+    await msg.answer("⏱ Xabar necha daqiqada yoki soatda bir marta yuborilsin?", reply_markup=b.as_markup())
+    await state.set_state(AutoBroadcastSetup.interval_unit)
+
+
+@dp.callback_query(F.data == "bc_unit_min")
+async def bc_unit_min(cb: types.CallbackQuery, state: FSMContext):
+    await state.update_data(bc_unit="min")
+    await cb.message.answer("🔢 Necha daqiqada bir marta yuborilsin? Raqam kiriting (masalan: 30):")
+    await state.set_state(AutoBroadcastSetup.interval_value)
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "bc_unit_hour")
+async def bc_unit_hour(cb: types.CallbackQuery, state: FSMContext):
+    await state.update_data(bc_unit="hour")
+    await cb.message.answer("🔢 Necha soatda bir marta yuborilsin? Raqam kiriting (masalan: 3):")
+    await state.set_state(AutoBroadcastSetup.interval_value)
+    await cb.answer()
+
+
+@dp.message(AutoBroadcastSetup.interval_value)
+async def bc_interval_value(msg: types.Message, state: FSMContext):
+    uid, lang = msg.from_user.id, await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = (msg.text or "").strip()
+    if not txt.isdigit() or int(txt) <= 0:
+        await msg.answer("❌ Faqat musbat raqam kiriting:")
+        return
+    value = int(txt)
+    d = await state.get_data()
+    unit = d.get("bc_unit", "min")
+    interval_seconds = value * 60 if unit == "min" else value * 3600
+    chosen = d.get("bc_chosen", [])
+    content = d.get("bc_content")
+    if not chosen or not content:
+        await state.clear()
+        await msg.answer("❌ Xatolik: ma'lumot yetarli emas, qaytadan urinib ko'ring.", reply_markup=main_kb(lang))
+        return
+    await autobroadcast_col.insert_one({
+        "user_id": uid,
+        "channels": chosen,
+        "content": content,
+        "interval_seconds": interval_seconds,
+        "next_run": datetime.now() + timedelta(seconds=interval_seconds),
+        "active": True,
+        "created_at": now(),
+    })
+    await state.clear()
+    unit_txt = "daqiqa" if unit == "min" else "soat"
+    await msg.answer(
+        f"✅ Avto xabar sozlandi! Har {value} {unit_txt}da {len(chosen)} ta kanalga yuboriladi.",
+        reply_markup=main_kb(lang)
+    )
+
+
+async def broadcast_scheduler_loop():
+    """Har 30 soniyada DB'ni tekshirib, vaqti kelgan avto xabarlarni yuboradi."""
+    while True:
+        try:
+            now_ts = datetime.now()
+            async for cfg in autobroadcast_col.find({"active": True, "next_run": {"$lte": now_ts}}):
+                client = userbot_manager.get_client(cfg["user_id"])
+                if not client:
+                    continue
+                content = cfg.get("content", {})
+                for ch in cfg.get("channels", []):
+                    try:
+                        entity = InputPeerChannel(ch["id"], ch["access_hash"])
+                        if content.get("type") == "text":
+                            await client.send_message(entity, content.get("text", ""))
+                        else:
+                            raw = base64.b64decode(content["media_b64"])
+                            bio = BytesIO(raw)
+                            bio.name = content.get("filename", "file.dat")
+                            await client.send_file(entity, bio, caption=content.get("caption") or None)
+                    except Exception as e:
+                        logging.error(f"Avto xabar yuborishda xato ({cfg['user_id']} -> {ch.get('title')}): {e}")
+                await autobroadcast_col.update_one(
+                    {"_id": cfg["_id"]},
+                    {"$set": {
+                        "next_run": now_ts + timedelta(seconds=cfg["interval_seconds"]),
+                        "last_run": now(),
+                    }}
+                )
+        except Exception as e:
+            logging.error(f"Broadcast scheduler xatosi: {e}")
+        await asyncio.sleep(30)
+
+
+# ═══════════════════════════════════════════════════════
 # POLLING + MAIN
 # (Webhook o'rniga polling ishlatiladi — Render "Background Worker" yoki
 #  "Web Service" bo'lishidan qat'iy nazar ishonchli ishlaydi, chunki
@@ -4729,6 +5497,11 @@ async def on_startup_polling():
         await bot.delete_webhook(drop_pending_updates=True)
     except Exception as e:
         logging.warning(f"Webhook o'chirishda xato (muhim emas): {e}")
+    # AI Yordamchi: avval ulangan barcha shaxsiy akkauntlarni qayta ulaymiz
+    try:
+        await userbot_manager.restart_all()
+    except Exception as e:
+        logging.error(f"Userbot'larni qayta ulashda xato: {e}")
     logging.info("✅ Bot polling rejimida ishga tushdi")
 
 
@@ -4751,6 +5524,7 @@ async def _run_health_server():
 async def main_async():
     await on_startup_polling()
     await _run_health_server()
+    asyncio.create_task(broadcast_scheduler_loop())
     await dp.start_polling(bot)
 
 
