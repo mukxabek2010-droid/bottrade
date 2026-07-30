@@ -250,12 +250,24 @@
     </div>
 
     <div class="foot-note">Roblox Trade &amp; Robux — Yutuqli o'yin</div>
+    <div class="foot-note" id="debugLine" style="color:#ffb3b3;"></div>
   </div>
 
 <script>
 (function(){
   const tg = window.Telegram && window.Telegram.WebApp ? window.Telegram.WebApp : null;
   if (tg) { tg.ready(); tg.expand(); }
+
+  // ── VAQTINCHALIK DIAGNOSTIKA (muammo topilgach olib tashlanadi) ──
+  try {
+    const dbg = document.getElementById('debugLine');
+    const sdk = tg ? 'bor' : 'YO\'Q';
+    const hasInitData = tg && tg.initData ? tg.initData.length : 0;
+    const hasUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? 'bor' : 'yo\'q';
+    const platform = tg ? tg.platform : '-';
+    const ver = tg ? tg.version : '-';
+    dbg.textContent = `[debug] SDK:${sdk} platform:${platform} ver:${ver} initData_len:${hasInitData} user:${hasUser}`;
+  } catch(e){}
 
   // ── 1) Darhol ko'rsatish: Telegram bergan user ma'lumotlari (tez) ──
   const tgUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
