@@ -46,7 +46,7 @@
     display:flex; flex-direction:column; gap:12px;
   }
 
-  /* ── INTEGRATED HEADER (PROFIL + BALANS TOGETHER) ── */
+  /* ── HEADER (PROFIL + BALANS INTEGRATSIYA) ── */
   .header{
     display:flex; align-items:center; justify-content:space-between; gap:8px;
     background:rgba(20, 15, 45, 0.7); border:1px solid var(--card-line);
@@ -54,19 +54,18 @@
     border-radius:20px; padding:10px 12px;
   }
   .user-block{display:flex; align-items:center; gap:10px; min-width:0;}
-  .avatar-ring{width:40px;height:40px; border-radius:50%; padding:2px;
+  .avatar-ring{width:42px;height:42px; border-radius:50%; padding:2px;
     background:linear-gradient(135deg,var(--gold),var(--violet)); flex-shrink:0;}
   .avatar{width:100%;height:100%;border-radius:50%; display:flex;align-items:center;justify-content:center;
-    background:var(--bg-mid); color:var(--gold); font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px;}
+    background:var(--bg-mid); color:var(--gold); font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:14px; object-fit:cover;}
   .who{min-width:0;}
   .who .name{font-weight:800; font-size:13px; line-height:1.2; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
   .who .idbadge{font-family:'Space Grotesk',monospace; font-size:10px; color:var(--ink-dim); margin-top:2px; display:inline-block;}
 
-  /* Balans qismi profil ichiga olindi */
   .header-balance{
     display:flex; align-items:center; gap:8px;
     background:rgba(255,201,60,.1); border:1px solid rgba(255,201,60,.25);
-    padding:6px 10px; border-radius:14px;
+    padding:6px 10px; border-radius:14px; cursor:pointer;
   }
   .bal-info{display:flex; flex-direction:column; align-items:flex-end;}
   .bal-label{font-size:9px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:0.5px;}
@@ -108,21 +107,18 @@
   .crash-mult-val.won{color:var(--green); text-shadow:0 0 20px rgba(61,220,132,.8);}
   .crash-status-txt{font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:1px; color:var(--ink-dim); margin-top:-4px;}
 
-  /* Sound FX Control */
   .sound-toggle{
     position:absolute; top:10px; right:10px; z-index:5;
     background:rgba(0,0,0,.5); border:1px solid var(--card-line); color:#fff;
     border-radius:10px; padding:4px 8px; font-size:11px; cursor:pointer; backdrop-filter:blur(4px);
   }
 
-  /* History Chips */
   .crash-history{display:flex; gap:6px; overflow-x:auto; padding-bottom:2px; scrollbar-width:none;}
   .crash-history::-webkit-scrollbar{display:none;}
   .h-chip{font-family:'Space Grotesk',sans-serif; font-size:11px; font-weight:700; padding:4px 8px; border-radius:8px; flex-shrink:0;}
   .h-chip.win{background:rgba(61,220,132,.18); color:var(--green); border:1px solid rgba(61,220,132,.3);}
   .h-chip.lose{background:rgba(255,77,77,.18); color:var(--red); border:1px solid rgba(255,77,77,.3);}
 
-  /* Bet Controls */
   .bet-box{display:flex; flex-direction:column; gap:8px;}
   .bet-input-wrap{display:flex; gap:8px;}
   .bet-input{
@@ -148,7 +144,6 @@
   }
   .chip:active{background:rgba(255,255,255,.15); color:#fff;}
 
-  /* 👥 LIVE BETS TABLE */
   .live-bets-wrap{display:flex; flex-direction:column; gap:6px; margin-top:4px;}
   .live-bets-header{display:flex; justify-content:space-between; font-size:11px; font-weight:700; color:var(--ink-dim); padding:0 4px;}
   .live-bets-list{display:flex; flex-direction:column; gap:4px; max-height:160px; overflow-y:auto;}
@@ -167,10 +162,21 @@
   .bet-res.playing{color:var(--gold);}
   .bet-res.lost{color:var(--red);}
 
-  /* Menu & Profile Grid */
+  /* Menu Grid */
   .menu-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
   .menu-item{background:rgba(255,255,255,.05); border:1px solid var(--card-line); border-radius:16px; padding:16px; text-align:center; cursor:pointer;}
   .menu-item .ico{font-size:26px;} .menu-item .lab{font-size:13px; font-weight:700; margin-top:6px;}
+
+  /* Profile Panel */
+  .profile-hero{display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding-top:6px;}
+  .profile-hero .avatar-ring{width:70px;height:70px;}
+  .profile-hero .avatar{font-size:24px;}
+  .profile-hero .pname{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:18px;}
+  .profile-hero .puname{font-size:12px; color:var(--ink-dim);}
+  .stat-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px;}
+  .stat-box{background:rgba(255,255,255,.05); border:1px solid var(--card-line); border-radius:14px; padding:12px;}
+  .stat-box .lab{font-size:11px; color:var(--ink-dim);}
+  .stat-box .val{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:15px; margin-top:3px;}
 
   /* Bottom Nav */
   .navbar{position:fixed; left:0; right:0; bottom:0; z-index:20; padding-bottom:var(--safe-bottom);
@@ -185,11 +191,12 @@
 
   <div class="wrap">
 
-    <!-- ── INTEGRATED HEADER (PROFIL + BALANS BURLASHGAN) ── -->
+    <!-- ── INTEGRATED HEADER (PROFIL + REAL BALANS) ── -->
     <div class="header">
       <div class="user-block">
         <div class="avatar-ring">
-          <div class="avatar" id="userAvatar">U</div>
+          <img class="avatar" id="avatarImg" alt="" style="display:none;">
+          <div class="avatar" id="avatarFallback">?</div>
         </div>
         <div class="who">
           <div class="name" id="userName">Yuklanmoqda...</div>
@@ -197,13 +204,13 @@
         </div>
       </div>
 
-      <!-- Live Balans bloki header o'zida -->
-      <div class="header-balance">
+      <!-- Real Balans -->
+      <div class="header-balance" id="topupBtn">
         <div class="bal-info">
           <span class="bal-label">Balans</span>
-          <span class="bal-num" id="headerBalance">0 so'm</span>
+          <span class="bal-num" id="headerBalance">— so'm</span>
         </div>
-        <button class="add-btn" id="topupBtn">+</button>
+        <button class="add-btn">+</button>
       </div>
     </div>
 
@@ -212,7 +219,6 @@
       <div class="card crash-card">
         <button class="sound-toggle" id="soundToggle">🔊 Ovoz ON</button>
 
-        <!-- Canvas Stage -->
         <div class="canvas-stage" id="canvasStage">
           <canvas id="crashCanvas"></canvas>
           <div class="crash-overlay">
@@ -221,10 +227,8 @@
           </div>
         </div>
 
-        <!-- History -->
         <div class="crash-history" id="crashHistory"></div>
 
-        <!-- Bet Controls -->
         <div class="bet-box">
           <div class="bet-input-wrap">
             <input class="bet-input" id="betInput" type="number" inputmode="numeric" placeholder="Stavka (1,000 - 200,000)" value="5000">
@@ -239,7 +243,6 @@
           </div>
         </div>
 
-        <!-- Live Bets Table -->
         <div class="live-bets-wrap">
           <div class="live-bets-header">
             <span>O'YINCHILAR (LIVE)</span>
@@ -253,20 +256,40 @@
     <!-- ══════════ 2) MENYU ══════════ -->
     <div class="panel" id="panel-menu">
       <div class="menu-grid">
-        <div class="menu-item" id="btnDeposit"><div class="ico">💰</div><div class="lab">Hisob to'ldirish</div></div>
-        <div class="menu-item" id="btnWithdraw"><div class="ico">💳</div><div class="lab">Pul yechish</div></div>
-        <div class="menu-item" id="btnBuy"><div class="ico">🛒</div><div class="lab">Robux do'kon</div></div>
-        <div class="menu-item" id="btnProfile"><div class="ico">👤</div><div class="lab">Mening profilim</div></div>
+        <div class="menu-item" data-action="open_deposit"><div class="ico">💰</div><div class="lab">Hisob to'ldirish</div></div>
+        <div class="menu-item" data-action="open_withdraw"><div class="ico">💳</div><div class="lab">Pul yechish</div></div>
+        <div class="menu-item" data-action="open_buy"><div class="ico">🛒</div><div class="lab">Robux do'kon</div></div>
+        <div class="menu-item" data-action="open_referral"><div class="ico">🎁</div><div class="lab">Referal</div></div>
+      </div>
+    </div>
+
+    <!-- ══════════ 3) PROFIL ══════════ -->
+    <div class="panel" id="panel-profile">
+      <div class="card profile-hero">
+        <div class="avatar-ring">
+          <img class="avatar" id="avatarImg2" alt="" style="display:none;">
+          <div class="avatar" id="avatarFallback2">?</div>
+        </div>
+        <div class="pname" id="profileName">—</div>
+        <div class="puname" id="profileUname"></div>
+        <div class="idbadge" id="profileId">ID —</div>
+      </div>
+      <div class="stat-grid">
+        <div class="stat-box"><div class="lab">💰 Balans</div><div class="val" id="pStatBalance">—</div></div>
+        <div class="stat-box"><div class="lab">📈 Jami kiritilgan</div><div class="val" id="pStatDeposited">—</div></div>
+        <div class="stat-box"><div class="lab">📅 Ro'yxatdan o'tgan</div><div class="val" id="pStatJoined">—</div></div>
+        <div class="stat-box"><div class="lab">🎁 Referallar</div><div class="val" id="pStatRefs">—</div></div>
       </div>
     </div>
 
   </div>
 
-  <!-- ── NAVBAR (FAQAT CRASH VA MENYU) ── -->
+  <!-- ── NAVBAR ── -->
   <div class="navbar">
     <div class="navbar-inner">
       <button class="nav-btn active" data-tab="crash"><span class="ico">🚀</span><span class="lab">Crash</span></button>
       <button class="nav-btn" data-tab="menu"><span class="ico">☰</span><span class="lab">Menyu</span></button>
+      <button class="nav-btn" data-tab="profile"><span class="ico">👤</span><span class="lab">Profil</span></button>
     </div>
   </div>
 
@@ -278,23 +301,68 @@
   function haptic(type){ if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred(type || 'light'); }
   function notify(type){ if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred(type); }
   function fmt(n){ try { return Math.round(Number(n)).toLocaleString('ru-RU'); } catch(e){ return n; } }
+  function initials(str){ if(!str) return '?'; return str.trim().split(/\s+/).map(s=>s[0]).slice(0,2).join('').toUpperCase(); }
 
-  // ══════════ BALANS VA PROFIL ══════════
-  let currentBalance = 50000;
+  // ══════════ REAL BALANS VA PROFIL INTEGRATSIYASI ══════════
+  let currentBalance = 0;
   const tgUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
-  
-  if(tgUser){
-    document.getElementById('userName').textContent = tgUser.first_name || 'O\'yinchi';
+
+  function setAvatar(imgId, fbId, url, fallbackText){
+    const img = document.getElementById(imgId), fb = document.getElementById(fbId);
+    if (url) {
+      img.src = url; img.style.display = 'block'; fb.style.display = 'none';
+      img.onerror = function(){ img.style.display='none'; fb.style.display='flex'; };
+    } else {
+      fb.textContent = fallbackText;
+    }
+  }
+
+  if (tgUser) {
+    const fullName = [tgUser.first_name, tgUser.last_name].filter(Boolean).join(' ') || 'Foydalanuvchi';
+    document.getElementById('userName').textContent = fullName;
     document.getElementById('userId').textContent = 'ID: ' + tgUser.id;
-    document.getElementById('userAvatar').textContent = (tgUser.first_name || 'U')[0].toUpperCase();
+    
+    document.getElementById('profileName').textContent = fullName;
+    document.getElementById('profileUname').textContent = tgUser.username ? ('@' + tgUser.username) : '';
+    document.getElementById('profileId').textContent = 'ID: ' + tgUser.id;
+
+    setAvatar('avatarImg','avatarFallback', tgUser.photo_url, initials(fullName));
+    setAvatar('avatarImg2','avatarFallback2', tgUser.photo_url, initials(fullName));
   } else {
     document.getElementById('userName').textContent = 'O\'yinchi';
   }
 
   function updateBalanceUI() {
     document.getElementById('headerBalance').textContent = fmt(currentBalance) + " so'm";
+    document.getElementById('pStatBalance').textContent = fmt(currentBalance) + " so'm";
   }
-  updateBalanceUI();
+
+  // BOT API DANT REAL BALANS VA MA'LUMOTLARNI OLISH
+  async function loadMe(){
+    if (!tg || !tg.initData) return;
+    try {
+      const res = await fetch('/webapp/api/me?initData=' + encodeURIComponent(tg.initData));
+      if (!res.ok) throw new Error('unauthorized');
+      const d = await res.json();
+      currentBalance = d.balance || 0;
+      updateBalanceUI();
+
+      document.getElementById('pStatDeposited').textContent = fmt(d.total_deposited || 0) + " so'm";
+      document.getElementById('pStatJoined').textContent = d.joined || '-';
+      document.getElementById('pStatRefs').textContent = (d.ref_count || 0) + " ta";
+    } catch(e) {
+      updateBalanceUI();
+    }
+  }
+  loadMe();
+
+  // Depozit ochish Action
+  document.getElementById('topupBtn').addEventListener('click', function(){
+    if (!tg) return;
+    haptic('light');
+    tg.sendData(JSON.stringify({ action: 'open_deposit' }));
+    tg.close();
+  });
 
   // ══════════ SOUND FX ENGINE ══════════
   let soundEnabled = true;
@@ -361,6 +429,15 @@
       document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
       btn.classList.add('active');
+    });
+  });
+
+  document.querySelectorAll('.menu-item').forEach(function(el){
+    el.addEventListener('click', function(){
+      if (!tg) return;
+      haptic('light');
+      tg.sendData(JSON.stringify({ action: el.dataset.action }));
+      tg.close();
     });
   });
 
