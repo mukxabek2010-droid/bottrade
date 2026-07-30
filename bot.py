@@ -4991,8 +4991,42 @@ async def ub_got_phone(msg: types.Message, state: FSMContext):
         await state.clear()
         return
     PENDING_LOGIN[uid] = {"client": client, "phone": phone, "phone_code_hash": sent.phone_code_hash}
-    await wait_msg.edit_text("🔑 Telegramdan kelgan kodni kiriting:")
+    type_name = type(sent.type).__name__
+    logging.info(f"send_code_request natijasi ({phone}): {type_name}")
+    if "Call" in type_name:
+        method_txt = "☎️ *Qo'ng'iroq orqali* yuboriladi — telefoningizga qo'ng'iroq keladi, охирги 4 ta raqam kod bo'ladi."
+    elif "Sms" in type_name:
+        method_txt = "📩 *SMS orqali* yuborildi — SMS xabarlaringizni tekshiring."
+    elif "App" in type_name:
+        method_txt = "📲 *Telegram ilovasi orqali* yuborildi — ilovadagi \"Telegram\" rasmiy xabarlar chatini tekshiring."
+    else:
+        method_txt = f"ℹ️ Yuborish usuli: {type_name}"
+    rb = InlineKeyboardBuilder()
+    rb.button(text="🔁 SMS orqali qayta yuborish", callback_data="ub_resend_sms")
+    rb.adjust(1)
+    await wait_msg.edit_text(
+        f"🔑 Kod yuborildi.\n{method_txt}\n\nKelgan kodni shu yerga kiriting:",
+        reply_markup=rb.as_markup()
+    )
     await state.set_state(UserbotConnect.code)
+
+
+@dp.callback_query(F.data == "ub_resend_sms")
+async def ub_resend_sms(cb: types.CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    pend = PENDING_LOGIN.get(uid)
+    if not pend:
+        await cb.answer("Sessiya tugagan, qaytadan boshlang.", show_alert=True)
+        return
+    try:
+        sent = await pend["client"].send_code_request(pend["phone"], force_sms=True)
+        pend["phone_code_hash"] = sent.phone_code_hash
+        await cb.answer("📩 SMS qayta yuborildi!", show_alert=True)
+    except FloodWaitError as e:
+        await cb.answer(f"❌ Juda ko'p urinish. {e.seconds} soniyadan keyin urining.", show_alert=True)
+    except Exception as e:
+        logging.error(f"force_sms xatosi: {e}")
+        await cb.answer("❌ Xatolik yuz berdi.", show_alert=True)
 
 
 @dp.message(UserbotConnect.code)
