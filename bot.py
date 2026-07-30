@@ -26,7 +26,7 @@ from telethon.sessions import StringSession
 from telethon.errors import (
     SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError,
     PasswordHashInvalidError, FloodWaitError, PhoneNumberInvalidError,
-    ResendCodeRequestError,
+    SendCodeUnavailableError,
 )
 from telethon.tl.types import Channel, Chat, InputPeerChannel
 
@@ -5039,7 +5039,7 @@ async def ub_resend_sms(cb: types.CallbackQuery, state: FSMContext):
         await cb.answer(txt, show_alert=True)
     except FloodWaitError as e:
         await cb.answer(f"❌ Juda ko'p urinish. {e.seconds} soniyadan keyin urining.", show_alert=True)
-    except ResendCodeRequestError:
+    except SendCodeUnavailableError:
         await cb.answer(
             "❌ Bu raqam uchun barcha yuborish usullari (flash-call, SMS) allaqachon "
             "ishlatilgan. Kod Telegram ilovangizdagi \"Telegram\" rasmiy xabarlar "
