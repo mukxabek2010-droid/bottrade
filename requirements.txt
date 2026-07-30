@@ -7,3 +7,5 @@ pydantic-core==2.14.6
 aiohttp>=3.9.0
 pyTelegramBotAPI
 requests
+telethon==1.36.0
+cryptography>=42.0.0
