@@ -1,4 +1,4 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="uz">
 <head>
 <meta charset="UTF-8">
@@ -185,9 +185,73 @@
   .nav-btn{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; background:none; border:none; color:var(--ink-dim); cursor:pointer;}
   .nav-btn.active{color:var(--gold);}
   .nav-btn .ico{font-size:20px;} .nav-btn .lab{font-size:11px; font-weight:700;}
+
+  /* ── OFFLINE OVERLAY (internet yo'q bo'lganda) ── */
+  .offline-overlay{
+    position:fixed; inset:0; z-index:9999; display:none;
+    flex-direction:column; align-items:center; justify-content:center; gap:16px;
+    background:rgba(5,3,12,.88); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  }
+  .offline-overlay.show{display:flex;}
+  .offline-spinner{
+    width:52px; height:52px; border-radius:50%;
+    border:4px solid rgba(255,255,255,.12); border-top-color:var(--gold);
+    animation:spin 0.9s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .offline-text{font-size:13px; font-weight:700; color:var(--ink-dim); text-align:center; padding:0 20px;}
+
+  /* ── SAVDO (SALES) SECTION ── */
+  .sale-list{display:flex; flex-direction:column; gap:10px;}
+  .sale-item{display:flex; gap:10px; background:var(--card); border:1px solid var(--card-line); border-radius:16px; padding:10px;}
+  .sale-item img{width:56px; height:56px; border-radius:12px; object-fit:cover; background:rgba(255,255,255,.06); flex-shrink:0;}
+  .sale-item .s-info{display:flex; flex-direction:column; justify-content:center; gap:3px; min-width:0;}
+  .sale-item .s-game{font-size:10px; color:var(--violet); font-weight:700; text-transform:uppercase;}
+  .sale-item .s-price{font-family:'Space Grotesk',sans-serif; font-weight:800; color:var(--gold); font-size:14px;}
+  .sale-empty{text-align:center; color:var(--ink-dim); font-size:12px; padding:30px 10px;}
+
+  .fab-add{
+    position:fixed; right:16px; bottom:calc(var(--navh) + 16px + var(--safe-bottom));
+    width:52px; height:52px; border-radius:50%; border:none; z-index:15;
+    background:linear-gradient(135deg,var(--gold),var(--gold-2)); color:#1a0f00;
+    font-size:26px; font-weight:800; display:flex; align-items:center; justify-content:center;
+    box-shadow:0 8px 24px rgba(255,157,60,.4); cursor:pointer;
+  }
+  .fab-add:active{transform:scale(.94);}
+
+  /* Savdo qo'shish modal */
+  .sale-modal-backdrop{
+    position:fixed; inset:0; z-index:9998; display:none; align-items:flex-end; justify-content:center;
+    background:rgba(5,3,12,.7); backdrop-filter:blur(4px);
+  }
+  .sale-modal-backdrop.show{display:flex;}
+  .sale-modal{
+    width:100%; max-width:480px; background:var(--bg-mid); border:1px solid var(--card-line);
+    border-radius:20px 20px 0 0; padding:18px 16px calc(18px + var(--safe-bottom));
+    display:flex; flex-direction:column; gap:12px; animation:fadein .2s ease;
+  }
+  .sale-modal h3{margin:0; font-family:'Space Grotesk',sans-serif; font-size:16px;}
+  .sale-photo-box{
+    width:100%; height:140px; border-radius:14px; border:1.5px dashed var(--card-line);
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:6px;
+    color:var(--ink-dim); font-size:12px; font-weight:700; cursor:pointer; overflow:hidden;
+    background:rgba(255,255,255,.03);
+  }
+  .sale-photo-box img{width:100%; height:100%; object-fit:cover;}
+  .sale-select, .sale-price-input{
+    width:100%; background:rgba(255,255,255,.06); border:1px solid var(--card-line); border-radius:14px;
+    padding:12px 14px; color:var(--ink); font-family:'Manrope',sans-serif; font-weight:700; font-size:14px;
+  }
+  .sale-select:focus, .sale-price-input:focus{outline:none; border-color:var(--gold);}
 </style>
 </head>
 <body>
+
+  <!-- ── OFFLINE OVERLAY ── -->
+  <div class="offline-overlay" id="offlineOverlay">
+    <div class="offline-spinner"></div>
+    <div class="offline-text">Internet aloqasi yo'q...<br>Ulanish tiklanishi kutilmoqda</div>
+  </div>
 
   <div class="wrap">
 
@@ -282,13 +346,48 @@
       </div>
     </div>
 
+    <!-- ══════════ 4) SAVDO ══════════ -->
+    <div class="panel" id="panel-sale">
+      <div class="sale-list" id="saleList">
+        <div class="sale-empty">Hali e'lonlar yo'q. Pastdagi + tugmasi orqali qo'shing.</div>
+      </div>
+    </div>
+
   </div>
+
+  <!-- Savdo bo'limida ko'rinadigan qo'shish tugmasi -->
+  <button class="fab-add" id="saleFab" style="display:none;">+</button>
+
+  <!-- Savdo qo'shish modal -->
+  <div class="sale-modal-backdrop" id="saleModalBackdrop">
+    <div class="sale-modal">
+      <h3>Savdo qo'shish</h3>
+      <div class="sale-photo-box" id="salePhotoBox">
+        <span id="salePhotoLabel">📷 Rasm tanlash uchun bosing</span>
+        <input type="file" accept="image/*" id="salePhotoInput" style="display:none;">
+      </div>
+      <select class="sale-select" id="saleGameSelect">
+        <option value="">Qaysi o'yindagi item?</option>
+        <option value="steal_brainrot">🧠 Steal a Brainrot</option>
+        <option value="grow_garden">🌱 Grow a Garden</option>
+        <option value="escape_tsunami">🌊 Escape Tsunami</option>
+        <option value="mm2">🔪 MM2</option>
+        <option value="blox_fruit">🍎 Blox Fruit</option>
+        <option value="escape_keyboard">⌨️ Escape Keyboard</option>
+      </select>
+      <input type="number" inputmode="numeric" class="sale-price-input" id="salePriceInput" placeholder="Narxi (so'mda)">
+      <button class="big-btn gold" id="saleSubmitBtn">Yuborish</button>
+      <button class="big-btn" id="saleCancelBtn" style="background:rgba(255,255,255,.08); color:#fff;">Bekor qilish</button>
+    </div>
+  </div>
+
 
   <!-- ── NAVBAR ── -->
   <div class="navbar">
     <div class="navbar-inner">
       <button class="nav-btn active" data-tab="crash"><span class="ico">🚀</span><span class="lab">Crash</span></button>
       <button class="nav-btn" data-tab="menu"><span class="ico">☰</span><span class="lab">Menyu</span></button>
+      <button class="nav-btn" data-tab="sale"><span class="ico">🛍️</span><span class="lab">Savdo</span></button>
       <button class="nav-btn" data-tab="profile"><span class="ico">👤</span><span class="lab">Profil</span></button>
     </div>
   </div>
@@ -355,6 +454,75 @@
     }
   }
   loadMe();
+
+  // ══════════ INTERNET HOLATINI KUZATISH (OFFLINE OVERLAY) ══════════
+  const offlineOverlay = document.getElementById('offlineOverlay');
+  let netCheckTimer = null;
+
+  function showOffline(){ offlineOverlay.classList.add('show'); }
+  function hideOffline(){ offlineOverlay.classList.remove('show'); }
+
+  async function checkConnectivity(){
+    try {
+      const res = await fetch(window.location.href.split('?')[0], { method: 'HEAD', cache: 'no-store' });
+      if (res.ok || res.type === 'opaque') { hideOffline(); return true; }
+      showOffline(); return false;
+    } catch(e) { showOffline(); return false; }
+  }
+
+  window.addEventListener('offline', showOffline);
+  window.addEventListener('online', () => { checkConnectivity(); loadMe(); });
+  if (!navigator.onLine) showOffline();
+  netCheckTimer = setInterval(checkConnectivity, 4000);
+
+  // ══════════ SAVDO (SALES) BO'LIMI ══════════
+  const saleFab = document.getElementById('saleFab');
+  const saleModalBackdrop = document.getElementById('saleModalBackdrop');
+  const salePhotoBox = document.getElementById('salePhotoBox');
+  const salePhotoInput = document.getElementById('salePhotoInput');
+  const salePhotoLabel = document.getElementById('salePhotoLabel');
+  const saleGameSelect = document.getElementById('saleGameSelect');
+  const salePriceInput = document.getElementById('salePriceInput');
+  const saleSubmitBtn = document.getElementById('saleSubmitBtn');
+  const saleCancelBtn = document.getElementById('saleCancelBtn');
+  let salePhotoDataUrl = null;
+
+  saleFab.addEventListener('click', () => {
+    haptic('light');
+    saleModalBackdrop.classList.add('show');
+  });
+
+  saleCancelBtn.addEventListener('click', () => {
+    saleModalBackdrop.classList.remove('show');
+  });
+
+  salePhotoBox.addEventListener('click', () => salePhotoInput.click());
+
+  salePhotoInput.addEventListener('change', () => {
+    const file = salePhotoInput.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      salePhotoDataUrl = e.target.result;
+      salePhotoBox.innerHTML = `<img src="${salePhotoDataUrl}" alt="">`;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  saleSubmitBtn.addEventListener('click', () => {
+    const game = saleGameSelect.value;
+    const price = parseInt(salePriceInput.value, 10);
+    if (!salePhotoDataUrl) { alert("Iltimos, rasm tanlang!"); return; }
+    if (!game) { alert("Iltimos, o'yinni tanlang!"); return; }
+    if (!price || price <= 0) { alert("Narxni to'g'ri kiriting!"); return; }
+    if (!tg) { alert("Bu funksiya faqat Telegram ichida ishlaydi."); return; }
+    haptic('medium');
+    // Bot chatiga o'tkazamiz: bot mavjud "Sotish qo'shish" oqimini (o'yin tanlash bosqichidan) davom ettiradi,
+    // rasm va narxni foydalanuvchi keyingi xabarlarda chatda yuboradi.
+    tg.sendData(JSON.stringify({ action: 'open_sale_add', game: game, price: price }));
+    saleModalBackdrop.classList.remove('show');
+    tg.close();
+  });
 
   // Depozit ochish Action
   document.getElementById('topupBtn').addEventListener('click', function(){
@@ -429,6 +597,7 @@
       document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
       btn.classList.add('active');
+      saleFab.style.display = (btn.dataset.tab === 'sale') ? 'flex' : 'none';
     });
   });
 
@@ -543,7 +712,23 @@
     });
   });
 
-  actionBtn.addEventListener('click', () => {
+  async function callBalanceApi(path, amount) {
+    if (!tg || !tg.initData) return null;
+    try {
+      const res = await fetch('/webapp/api/' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initData: tg.initData, amount: amount })
+      });
+      const d = await res.json();
+      if (!res.ok) return { error: d.error || 'error' };
+      return d;
+    } catch (e) {
+      return { error: 'network' };
+    }
+  }
+
+  actionBtn.addEventListener('click', async () => {
     if (audioCtx.state === 'suspended') audioCtx.resume();
 
     if (gameState === 'WAITING' && !myBetState.placed) {
@@ -556,7 +741,21 @@
         alert("Balans yetarli emas!");
         return;
       }
-      currentBalance -= amt;
+      actionBtn.className = "big-btn disabled";
+      actionBtn.textContent = "...";
+      const res = await callBalanceApi('bet', amt);
+      if (!res || res.error) {
+        if (res && res.error === 'insufficient_balance') {
+          currentBalance = res.balance; updateBalanceUI();
+          alert("Balans yetarli emas!");
+        } else if (res && res.error === 'network') {
+          alert("Internet aloqasi yo'q, qayta urinib ko'ring.");
+        }
+        actionBtn.className = "big-btn gold";
+        actionBtn.textContent = "Stavka Tikish";
+        return;
+      }
+      currentBalance = res.balance;
       updateBalanceUI();
       myBetState = { placed: true, amount: amt, cashedOut: false, winAmt: 0, lost: false };
       actionBtn.textContent = "Kutilmoqda...";
@@ -565,11 +764,19 @@
       renderBotsTable();
     } 
     else if (gameState === 'RUNNING' && myBetState.placed && !myBetState.cashedOut) {
+      const winAmt = Math.round(myBetState.amount * currentMult);
       myBetState.cashedOut = true;
-      myBetState.winAmt = Math.round(myBetState.amount * currentMult);
-      currentBalance += myBetState.winAmt;
+      myBetState.winAmt = winAmt;
+      actionBtn.className = "big-btn disabled";
+      actionBtn.textContent = "...";
+      const res = await callBalanceApi('cashout', winAmt);
+      if (res && !res.error) {
+        currentBalance = res.balance;
+      } else {
+        currentBalance += winAmt; // tarmoq nosozligida ham UI konsistent bo'lishi uchun mahalliy qo'shamiz
+      }
       updateBalanceUI();
-      
+
       playWinSound();
       haptic('heavy');
       notify('success');
