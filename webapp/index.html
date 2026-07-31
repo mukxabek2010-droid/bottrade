@@ -209,6 +209,10 @@
   .sale-item .s-game{font-size:10px; color:var(--violet); font-weight:700; text-transform:uppercase;}
   .sale-item .s-price{font-family:'Space Grotesk',sans-serif; font-weight:800; color:var(--gold); font-size:14px;}
   .sale-empty{text-align:center; color:var(--ink-dim); font-size:12px; padding:30px 10px;}
+  .sale-section{margin-bottom:18px;}
+  .sale-section-title{font-family:'Space Grotesk',sans-serif; font-size:13px; font-weight:800; color:var(--gold); margin:0 0 8px 2px; display:flex; align-items:center; gap:6px;}
+  .sale-section-count{font-size:10px; font-weight:700; color:var(--ink-dim); background:rgba(255,255,255,.06); border-radius:8px; padding:1px 7px;}
+  .sale-item .s-name{font-size:12px; font-weight:700; color:var(--ink); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
 
   .fab-add{
     position:fixed; right:16px; bottom:calc(var(--navh) + 16px + var(--safe-bottom));
@@ -487,6 +491,39 @@
   const saleCancelBtn = document.getElementById('saleCancelBtn');
   let salePhotoDataUrl = null;
 
+  const saleList = document.getElementById('saleList');
+  function fmtSom(n){ return Number(n||0).toLocaleString('ru-RU').replace(/,/g,' '); }
+
+  async function loadSales(){
+    saleList.innerHTML = '<div class="sale-empty">Yuklanmoqda...</div>';
+    try {
+      const res = await fetch('/webapp/api/sales', { cache: 'no-store' });
+      const data = await res.json();
+      const sections = (data.sections || []).filter(s => s.items && s.items.length > 0);
+      if (sections.length === 0) {
+        saleList.innerHTML = '<div class="sale-empty">Hali e\'lonlar yo\'q. Pastdagi + tugmasi orqali qo\'shing.</div>';
+        return;
+      }
+      saleList.innerHTML = sections.map(sec => `
+        <div class="sale-section">
+          <div class="sale-section-title">${sec.label} <span class="sale-section-count">${sec.items.length}</span></div>
+          ${sec.items.map(it => `
+            <div class="sale-item">
+              ${it.photo_url ? `<img src="${it.photo_url}" alt="">` : `<div class="sale-item-noimg" style="width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,.06);flex-shrink:0;"></div>`}
+              <div class="s-info">
+                <div class="s-name">${it.name || 'Nomsiz item'}</div>
+                <div class="s-game">${sec.label}</div>
+                <div class="s-price">${fmtSom(it.price)} so'm</div>
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      `).join('');
+    } catch(e) {
+      saleList.innerHTML = '<div class="sale-empty">Yuklab bo\'lmadi, internetni tekshiring.</div>';
+    }
+  }
+
   saleFab.addEventListener('click', () => {
     haptic('light');
     saleModalBackdrop.classList.add('show');
@@ -598,6 +635,7 @@
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
       btn.classList.add('active');
       saleFab.style.display = (btn.dataset.tab === 'sale') ? 'flex' : 'none';
+      if (btn.dataset.tab === 'sale') loadSales();
     });
   });
 
