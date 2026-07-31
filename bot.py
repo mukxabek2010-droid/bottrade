@@ -6093,7 +6093,8 @@ async def api_chat_global(request):
     messages = [{
         "user_id": d.get("user_id"), "name": d.get("name", ""), "username": d.get("username", ""),
         "photo_url": d.get("photo_url", ""), "text": d.get("text", ""),
-        "media_type": d.get("media_type"), "media_url": d.get("media_url"), "ts": d.get("ts", 0),
+        "media_type": d.get("media_type"), "media_url": d.get("media_url"),
+        "reply_to": d.get("reply_to"), "ts": d.get("ts", 0),
     } for d in docs]
     return _cors(web.json_response({"messages": messages}))
 
@@ -6112,7 +6113,9 @@ async def api_chat_global_send(request):
     media_type = body.get("media_type")
     media_b64 = body.get("media_base64")
     media_url = None
-    if media_type and media_b64:
+    if media_type == "sticker" and media_b64:
+        media_url = str(media_b64)[:16]
+    elif media_type and media_b64:
         _, media_url = await _upload_chat_media(uid, media_type, media_b64)
         if not media_url:
             return _cors(web.json_response({"error": "media_upload_failed"}, status=500))
@@ -6126,6 +6129,7 @@ async def api_chat_global_send(request):
         "text": text,
         "media_type": media_type if media_url else None,
         "media_url": media_url,
+        "reply_to": _sanitize_reply_to(body.get("reply_to")),
         "ts": int(time.time() * 1000),
     }
     await chat_global_col.insert_one(doc)
@@ -6195,6 +6199,32 @@ async def api_chat_contacts_add(request):
         "last_text": "", "last_ts": 0,
     }}))
 
+async def api_chat_peer(request):
+    """GET /webapp/api/chat/peer?initData=...&peer_id=... — bot orqali kelgan
+    '👀 Ko'rish' tugmasi bosilganda, Web App o'sha suhbatni to'g'ridan-to'g'ri
+    ochishi uchun peer profilini qaytaradi va kontaktni ikki tomonlama qo'shadi."""
+    tg_user = verify_webapp_initdata(request.query.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    await upsert_user_profile(tg_user)
+    try:
+        peer_id = int(request.query.get("peer_id", 0) or 0)
+    except Exception:
+        return _cors(web.json_response({"error": "bad_peer"}, status=400))
+    peer = await get_user(peer_id)
+    if not peer:
+        return _cors(web.json_response({"error": "not_found"}, status=404))
+    await ensure_chat_contact(uid, peer_id)
+    await ensure_chat_contact(peer_id, uid)
+    return _cors(web.json_response({"contact": {
+        "user_id": peer_id,
+        "name": display_name(peer),
+        "username": peer.get("username", ""),
+        "photo_url": peer.get("photo_url", ""),
+        "last_text": "", "last_ts": 0,
+    }}))
+
 async def api_chat_private(request):
     """GET /webapp/api/chat/private?initData=...&peer_id=...&after=<ts_ms>"""
     tg_user = verify_webapp_initdata(request.query.get("initData", ""))
@@ -6218,12 +6248,69 @@ async def api_chat_private(request):
         docs.reverse()
     messages = [{
         "user_id": d.get("from_id"), "name": d.get("name", ""), "text": d.get("text", ""),
-        "media_type": d.get("media_type"), "media_url": d.get("media_url"), "ts": d.get("ts", 0),
+        "media_type": d.get("media_type"), "media_url": d.get("media_url"),
+        "reply_to": d.get("reply_to"), "ts": d.get("ts", 0),
     } for d in docs]
     return _cors(web.json_response({"messages": messages}))
 
+def _sanitize_reply_to(raw):
+    """Frontend'dan kelgan reply_to ma'lumotini xavfsiz, qisqartirilgan holda saqlaydi."""
+    if not isinstance(raw, dict):
+        return None
+    try:
+        ref_ts = int(raw.get("ts", 0) or 0)
+    except Exception:
+        ref_ts = 0
+    if not ref_ts:
+        return None
+    return {
+        "ts": ref_ts,
+        "name": str(raw.get("name") or "Foydalanuvchi")[:80],
+        "text": str(raw.get("text") or "")[:200],
+        "media_type": raw.get("media_type") if raw.get("media_type") in ("photo", "video", "voice", "sticker") else None,
+    }
+
+async def _notify_private_message(peer_id: int, sender_tg_user: dict, text: str, media_type):
+    """Shaxsiy chatda kimdir yozganda, qabul qiluvchiga bot orqali xabar yuboradi:
+    kim yozdi, soati va Web App'dagi o'sha suhbatni to'g'ridan-to'g'ri ochadigan
+    '👀 Ko'rish' tugmasi bilan."""
+    try:
+        sender_name = display_name(sender_tg_user)
+        sender_uname = sender_tg_user.get("username", "") or ""
+        time_str = (datetime.utcnow() + timedelta(hours=5)).strftime("%H:%M")
+
+        if media_type == "sticker":
+            preview = "😊 Stiker yubordi"
+        elif media_type == "photo":
+            preview = "📷 Rasm yubordi"
+        elif media_type == "video":
+            preview = "🎬 Video yubordi"
+        elif media_type == "voice":
+            preview = "🎤 Ovozli xabar yubordi"
+        else:
+            snippet = (text or "").strip()
+            if len(snippet) > 120:
+                snippet = snippet[:120] + "…"
+            preview = f"_{esc_md(snippet)}_" if snippet else "Xabar yubordi"
+
+        uname_line = f" (@{esc_md(sender_uname)})" if sender_uname else ""
+        msg_text = (
+            f"✉️ *{esc_md(sender_name)}*{uname_line} sizga yozdi\n"
+            f"🕐 *{time_str}*\n\n"
+            f"{preview}"
+        )
+
+        kb = InlineKeyboardBuilder()
+        if WEBAPP_URL:
+            deep_url = f"{WEBAPP_URL}?open_chat={sender_tg_user['id']}"
+            kb.button(text="👀 Ko'rish", web_app=WebAppInfo(url=deep_url))
+
+        await bot.send_message(peer_id, msg_text, reply_markup=kb.as_markup() if WEBAPP_URL else None)
+    except Exception as e:
+        logging.warning(f"Shaxsiy chat bildirishnomasi yuborilmadi ({peer_id}): {e}")
+
 async def api_chat_private_send(request):
-    """POST /webapp/api/chat/private/send {initData, peer_id, text, media_type, media_base64}"""
+    """POST /webapp/api/chat/private/send {initData, peer_id, text, media_type, media_base64, reply_to}"""
     try:
         body = await request.json()
     except Exception:
@@ -6244,7 +6331,10 @@ async def api_chat_private_send(request):
     media_type = body.get("media_type")
     media_b64 = body.get("media_base64")
     media_url = None
-    if media_type and media_b64:
+    if media_type == "sticker" and media_b64:
+        # Stiker — haqiqiy fayl emas, shunchaki emoji/belgi, yuklashning hojati yo'q.
+        media_url = str(media_b64)[:16]
+    elif media_type and media_b64:
         _, media_url = await _upload_chat_media(uid, media_type, media_b64)
         if not media_url:
             return _cors(web.json_response({"error": "media_upload_failed"}, status=500))
@@ -6252,16 +6342,19 @@ async def api_chat_private_send(request):
         return _cors(web.json_response({"error": "empty_message"}, status=400))
     await ensure_chat_contact(uid, peer_id)
     await ensure_chat_contact(peer_id, uid)
+    reply_to = _sanitize_reply_to(body.get("reply_to"))
     doc = {
         "from_id": uid, "to_id": peer_id,
         "name": display_name(tg_user),
         "text": text,
         "media_type": media_type if media_url else None,
         "media_url": media_url,
+        "reply_to": reply_to,
         "ts": int(time.time() * 1000),
     }
     await chat_private_col.insert_one(doc)
     doc.pop("_id", None)
+    asyncio.create_task(_notify_private_message(peer_id, tg_user, text, doc["media_type"]))
     return _cors(web.json_response({"message": {**doc, "user_id": doc["from_id"]}}))
 
 async def api_crash_bet(request):
@@ -6432,6 +6525,7 @@ async def _run_health_server():
     app.router.add_post("/webapp/api/chat/contacts/add", api_chat_contacts_add)
     app.router.add_get("/webapp/api/chat/private", api_chat_private)
     app.router.add_post("/webapp/api/chat/private/send", api_chat_private_send)
+    app.router.add_get("/webapp/api/chat/peer", api_chat_peer)
 
     app.router.add_route("OPTIONS", "/webapp/api/{tail:.*}", api_options)
 
