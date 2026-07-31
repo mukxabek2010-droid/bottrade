@@ -442,10 +442,21 @@
 
   // BOT API DANT REAL BALANS VA MA'LUMOTLARNI OLISH
   async function loadMe(){
-    if (!tg || !tg.initData) return;
+    if (!tg || !tg.initData) {
+      document.getElementById('pStatBalance') && (document.getElementById('pStatBalance').textContent = "0 so'm");
+      showDebugBanner("⚠️ initData yo'q. Web App Telegram 'Menu Button' (web_app turida, HTTPS) orqali ochilishi kerak. Hozir oddiy link/brauzer orqali ochilgan bo'lishi mumkin.");
+      updateBalanceUI();
+      return;
+    }
     try {
       const res = await fetch('/webapp/api/me?initData=' + encodeURIComponent(tg.initData));
-      if (!res.ok) throw new Error('unauthorized');
+      if (!res.ok) {
+        let errBody = '';
+        try { errBody = JSON.stringify(await res.json()); } catch(e2) {}
+        showDebugBanner(`⚠️ Server xatosi (${res.status}): ${errBody || 'unauthorized'}`);
+        updateBalanceUI();
+        return;
+      }
       const d = await res.json();
       currentBalance = d.balance || 0;
       updateBalanceUI();
@@ -453,9 +464,27 @@
       document.getElementById('pStatDeposited').textContent = fmt(d.total_deposited || 0) + " so'm";
       document.getElementById('pStatJoined').textContent = d.joined || '-';
       document.getElementById('pStatRefs').textContent = (d.ref_count || 0) + " ta";
+      hideDebugBanner();
     } catch(e) {
+      showDebugBanner("⚠️ Tarmoq xatosi: " + (e && e.message ? e.message : e));
       updateBalanceUI();
     }
+  }
+
+  function showDebugBanner(text){
+    let b = document.getElementById('debugBanner');
+    if (!b) {
+      b = document.createElement('div');
+      b.id = 'debugBanner';
+      b.style.cssText = 'position:fixed;top:8px;left:8px;right:8px;z-index:9997;background:rgba(255,60,60,.15);border:1px solid rgba(255,60,60,.4);color:#ffb3b3;font-size:11px;font-weight:700;padding:8px 10px;border-radius:10px;text-align:center;';
+      document.body.appendChild(b);
+    }
+    b.textContent = text;
+    b.style.display = 'block';
+  }
+  function hideDebugBanner(){
+    const b = document.getElementById('debugBanner');
+    if (b) b.style.display = 'none';
   }
   loadMe();
 
