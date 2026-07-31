@@ -424,6 +424,11 @@ userbot_accounts   = mdb["userbot_accounts"]    # ulangan shaxsiy akkauntlar (se
 autoreply_col      = mdb["autoreply_settings"]  # avto javob sozlamalari
 autobroadcast_col  = mdb["autobroadcast"]       # avto xabar (kanallarga davriy yuborish) sozlamalari
 
+# ── Web App Chat tizimi uchun kolleksiyalar ──
+chat_global_col    = mdb["chat_global"]         # global chat xabarlari (hammaga ko'rinadi)
+chat_private_col   = mdb["chat_private"]        # shaxsiy chat xabarlari (ikki foydalanuvchi orasida)
+chat_contacts_col  = mdb["chat_contacts"]       # shaxsiy chat kontaktlar ro'yxati (owner_id -> peer_id)
+
 async def init_indexes():
     await users.create_index("user_id", unique=True)
     await deposits.create_index("user_id")
@@ -439,6 +444,10 @@ async def init_indexes():
     await userbot_accounts.create_index("user_id", unique=True)
     await autoreply_col.create_index("user_id", unique=True)
     await autobroadcast_col.create_index("user_id")
+    await users.create_index("username_lower")
+    await chat_global_col.create_index("ts")
+    await chat_private_col.create_index([("from_id", 1), ("to_id", 1), ("ts", 1)])
+    await chat_contacts_col.create_index([("owner_id", 1), ("peer_id", 1)], unique=True)
 
 # ═══════════════════════════════════════════════════════
 # HELPERS
@@ -469,10 +478,46 @@ async def set_user_lang(uid, lang):
 
 async def upsert_user(uid, uname, lang="uz"):
     upd = {
-        "$set": {"username": uname, "last_seen": now()},
+        "$set": {"username": uname, "username_lower": (uname or "").lower(), "last_seen": now()},
         "$setOnInsert": {"user_id": uid, "balance": 0, "total_deposited": 0, "joined": now(), "lang": lang}
     }
     await users.update_one({"user_id": uid}, upd, upsert=True)
+
+async def upsert_user_profile(tg_user: dict, lang: str = "uz"):
+    """Web App initData orqali kelgan foydalanuvchi profilini (ism, username, rasm)
+    bazada yangilaydi. Chat tizimi shu ma'lumotlar orqali foydalanuvchini
+    username bo'yicha topadi va ismi/rasmini ko'rsatadi."""
+    uid = tg_user["id"]
+    uname = tg_user.get("username", "") or ""
+    upd = {
+        "$set": {
+            "username": uname,
+            "username_lower": uname.lower(),
+            "first_name": tg_user.get("first_name", "") or "",
+            "last_name": tg_user.get("last_name", "") or "",
+            "photo_url": tg_user.get("photo_url", "") or "",
+            "last_seen": now(),
+        },
+        "$setOnInsert": {"user_id": uid, "balance": 0, "total_deposited": 0, "joined": now(), "lang": lang}
+    }
+    await users.update_one({"user_id": uid}, upd, upsert=True)
+
+def display_name(u: dict) -> str:
+    full = ((u.get("first_name") or "") + " " + (u.get("last_name") or "")).strip()
+    return full or u.get("username") or "Foydalanuvchi"
+
+async def find_user_by_username(username: str):
+    uname = (username or "").strip().lstrip("@").lower()
+    if not uname:
+        return None
+    return await users.find_one({"username_lower": uname})
+
+async def ensure_chat_contact(owner_id: int, peer_id: int):
+    await chat_contacts_col.update_one(
+        {"owner_id": owner_id, "peer_id": peer_id},
+        {"$setOnInsert": {"owner_id": owner_id, "peer_id": peer_id, "created_at": now()}},
+        upsert=True
+    )
 
 async def finalize_referral(uid: int, state: FSMContext):
     """Bazada saqlangan pending referal bo'lsa, foydalanuvchi hali ro'yxatdan
@@ -5991,10 +6036,10 @@ async def api_me(request):
     if not tg_user:
         return _cors(web.json_response({"error": "unauthorized"}, status=401))
     uid = tg_user["id"]
+    # Profilni (ism, username, rasm) har safar yangilab boramiz — Chat tizimi shu
+    # ma'lumotlar orqali foydalanuvchini username bo'yicha topadi.
+    await upsert_user_profile(tg_user)
     u = await get_user(uid)
-    if not u:
-        await upsert_user(uid, tg_user.get("username", ""))
-        u = await get_user(uid)
     ref_count = await get_ref_count(uid)
     return _cors(web.json_response({
         "balance": u.get("balance", 0),
@@ -6002,6 +6047,222 @@ async def api_me(request):
         "joined": u.get("joined", ""),
         "ref_count": ref_count,
     }))
+
+# ═══════════════════════════════════════════════════════
+# CHAT TIZIMI (Shaxsiy + Global) — Web App API
+# ═══════════════════════════════════════════════════════
+async def _upload_chat_media(uid, media_type, media_b64):
+    """Frontend'dan kelgan base64 media'ni Telegram serverlariga (bot orqali,
+    yuboruvchining shaxsiy chatiga) yuklab, hammabop file_id/URL qaytaradi."""
+    if not media_b64:
+        return None, None
+    try:
+        if "," in media_b64:
+            media_b64 = media_b64.split(",", 1)[1]
+        media_bytes = base64.b64decode(media_b64)
+    except Exception:
+        return None, None
+    try:
+        if media_type == "video":
+            sent = await bot.send_video(chat_id=uid, video=types.BufferedInputFile(media_bytes, filename="chat_video.mp4"))
+            file_id = sent.video.file_id
+        elif media_type == "voice":
+            sent = await bot.send_voice(chat_id=uid, voice=types.BufferedInputFile(media_bytes, filename="chat_voice.ogg"))
+            file_id = sent.voice.file_id
+        else:
+            sent = await bot.send_photo(chat_id=uid, photo=types.BufferedInputFile(media_bytes, filename="chat_photo.jpg"))
+            file_id = sent.photo[-1].file_id
+    except Exception:
+        return None, None
+    return file_id, f"/webapp/api/photo/{file_id}"
+
+async def api_chat_global(request):
+    """GET /webapp/api/chat/global?initData=...&after=<ts_ms> — global chat xabarlari."""
+    tg_user = verify_webapp_initdata(request.query.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    try:
+        after = int(request.query.get("after", 0) or 0)
+    except Exception:
+        after = 0
+    if after:
+        docs = await chat_global_col.find({"ts": {"$gt": after}}).sort("ts", 1).to_list(length=200)
+    else:
+        docs = await chat_global_col.find({}).sort("ts", -1).to_list(length=50)
+        docs.reverse()
+    messages = [{
+        "user_id": d.get("user_id"), "name": d.get("name", ""), "username": d.get("username", ""),
+        "photo_url": d.get("photo_url", ""), "text": d.get("text", ""),
+        "media_type": d.get("media_type"), "media_url": d.get("media_url"), "ts": d.get("ts", 0),
+    } for d in docs]
+    return _cors(web.json_response({"messages": messages}))
+
+async def api_chat_global_send(request):
+    """POST /webapp/api/chat/global/send {initData, text, media_type, media_base64}"""
+    try:
+        body = await request.json()
+    except Exception:
+        return _cors(web.json_response({"error": "bad_request"}, status=400))
+    tg_user = verify_webapp_initdata(body.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    await upsert_user_profile(tg_user)
+    text = (body.get("text") or "").strip()[:2000]
+    media_type = body.get("media_type")
+    media_b64 = body.get("media_base64")
+    media_url = None
+    if media_type and media_b64:
+        _, media_url = await _upload_chat_media(uid, media_type, media_b64)
+        if not media_url:
+            return _cors(web.json_response({"error": "media_upload_failed"}, status=500))
+    if not text and not media_url:
+        return _cors(web.json_response({"error": "empty_message"}, status=400))
+    doc = {
+        "user_id": uid,
+        "name": display_name(tg_user),
+        "username": tg_user.get("username", "") or "",
+        "photo_url": tg_user.get("photo_url", "") or "",
+        "text": text,
+        "media_type": media_type if media_url else None,
+        "media_url": media_url,
+        "ts": int(time.time() * 1000),
+    }
+    await chat_global_col.insert_one(doc)
+    doc.pop("_id", None)
+    return _cors(web.json_response({"message": doc}))
+
+async def api_chat_contacts(request):
+    """GET /webapp/api/chat/contacts?initData=... — shaxsiy chat kontaktlar ro'yxati."""
+    tg_user = verify_webapp_initdata(request.query.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    await upsert_user_profile(tg_user)
+    contact_docs = await chat_contacts_col.find({"owner_id": uid}).to_list(length=500)
+    result = []
+    for c in contact_docs:
+        peer_id = c["peer_id"]
+        peer = await get_user(peer_id)
+        if not peer:
+            continue
+        last = await chat_private_col.find({
+            "$or": [{"from_id": uid, "to_id": peer_id}, {"from_id": peer_id, "to_id": uid}]
+        }).sort("ts", -1).limit(1).to_list(length=1)
+        last_text, last_ts, last_media = "", 0, False
+        if last:
+            last_text = last[0].get("text", "")
+            last_ts = last[0].get("ts", 0)
+            last_media = bool(last[0].get("media_type"))
+        result.append({
+            "user_id": peer_id,
+            "name": display_name(peer),
+            "username": peer.get("username", ""),
+            "photo_url": peer.get("photo_url", ""),
+            "last_text": last_text, "last_ts": last_ts, "last_media": last_media,
+        })
+    result.sort(key=lambda x: x["last_ts"], reverse=True)
+    return _cors(web.json_response({"contacts": result}))
+
+async def api_chat_contacts_add(request):
+    """POST /webapp/api/chat/contacts/add {initData, username} — username orqali
+    foydalanuvchi qidirib, ikki tomonlama shaxsiy chatga qo'shadi."""
+    try:
+        body = await request.json()
+    except Exception:
+        return _cors(web.json_response({"error": "bad_request"}, status=400))
+    tg_user = verify_webapp_initdata(body.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    await upsert_user_profile(tg_user)
+    uname = (body.get("username") or "").strip()
+    if not uname:
+        return _cors(web.json_response({"error": "bad_username"}, status=400))
+    peer = await find_user_by_username(uname)
+    if not peer:
+        return _cors(web.json_response({"error": "not_found"}, status=404))
+    peer_id = peer["user_id"]
+    if peer_id == uid:
+        return _cors(web.json_response({"error": "self"}, status=400))
+    await ensure_chat_contact(uid, peer_id)
+    await ensure_chat_contact(peer_id, uid)
+    return _cors(web.json_response({"contact": {
+        "user_id": peer_id,
+        "name": display_name(peer),
+        "username": peer.get("username", ""),
+        "photo_url": peer.get("photo_url", ""),
+        "last_text": "", "last_ts": 0,
+    }}))
+
+async def api_chat_private(request):
+    """GET /webapp/api/chat/private?initData=...&peer_id=...&after=<ts_ms>"""
+    tg_user = verify_webapp_initdata(request.query.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    try:
+        peer_id = int(request.query.get("peer_id", 0) or 0)
+    except Exception:
+        return _cors(web.json_response({"error": "bad_peer"}, status=400))
+    try:
+        after = int(request.query.get("after", 0) or 0)
+    except Exception:
+        after = 0
+    q = {"$or": [{"from_id": uid, "to_id": peer_id}, {"from_id": peer_id, "to_id": uid}]}
+    if after:
+        q["ts"] = {"$gt": after}
+        docs = await chat_private_col.find(q).sort("ts", 1).to_list(length=200)
+    else:
+        docs = await chat_private_col.find(q).sort("ts", -1).to_list(length=50)
+        docs.reverse()
+    messages = [{
+        "user_id": d.get("from_id"), "name": d.get("name", ""), "text": d.get("text", ""),
+        "media_type": d.get("media_type"), "media_url": d.get("media_url"), "ts": d.get("ts", 0),
+    } for d in docs]
+    return _cors(web.json_response({"messages": messages}))
+
+async def api_chat_private_send(request):
+    """POST /webapp/api/chat/private/send {initData, peer_id, text, media_type, media_base64}"""
+    try:
+        body = await request.json()
+    except Exception:
+        return _cors(web.json_response({"error": "bad_request"}, status=400))
+    tg_user = verify_webapp_initdata(body.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    await upsert_user_profile(tg_user)
+    try:
+        peer_id = int(body.get("peer_id", 0) or 0)
+    except Exception:
+        return _cors(web.json_response({"error": "bad_peer"}, status=400))
+    peer = await get_user(peer_id)
+    if not peer:
+        return _cors(web.json_response({"error": "peer_not_found"}, status=404))
+    text = (body.get("text") or "").strip()[:2000]
+    media_type = body.get("media_type")
+    media_b64 = body.get("media_base64")
+    media_url = None
+    if media_type and media_b64:
+        _, media_url = await _upload_chat_media(uid, media_type, media_b64)
+        if not media_url:
+            return _cors(web.json_response({"error": "media_upload_failed"}, status=500))
+    if not text and not media_url:
+        return _cors(web.json_response({"error": "empty_message"}, status=400))
+    await ensure_chat_contact(uid, peer_id)
+    await ensure_chat_contact(peer_id, uid)
+    doc = {
+        "from_id": uid, "to_id": peer_id,
+        "name": display_name(tg_user),
+        "text": text,
+        "media_type": media_type if media_url else None,
+        "media_url": media_url,
+        "ts": int(time.time() * 1000),
+    }
+    await chat_private_col.insert_one(doc)
+    doc.pop("_id", None)
+    return _cors(web.json_response({"message": {**doc, "user_id": doc["from_id"]}}))
 
 async def api_crash_bet(request):
     """POST /webapp/api/bet {initData, amount} — stavkani serverda balansdan yechadi."""
@@ -6163,6 +6424,15 @@ async def _run_health_server():
     app.router.add_get("/webapp/api/sales", api_sales)
     app.router.add_post("/webapp/api/sale/add", api_sale_add)
     app.router.add_get("/webapp/api/photo/{file_id}", api_photo)
+
+    # 💬 Chat tizimi (Shaxsiy + Global) uchun API
+    app.router.add_get("/webapp/api/chat/global", api_chat_global)
+    app.router.add_post("/webapp/api/chat/global/send", api_chat_global_send)
+    app.router.add_get("/webapp/api/chat/contacts", api_chat_contacts)
+    app.router.add_post("/webapp/api/chat/contacts/add", api_chat_contacts_add)
+    app.router.add_get("/webapp/api/chat/private", api_chat_private)
+    app.router.add_post("/webapp/api/chat/private/send", api_chat_private_send)
+
     app.router.add_route("OPTIONS", "/webapp/api/{tail:.*}", api_options)
 
     # 🏆 Yutuqli o'yin uchun Web App fayllarini xizmat qilish (webapp/index.html)
