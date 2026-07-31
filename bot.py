@@ -6073,6 +6073,66 @@ async def api_photo(request):
     except Exception:
         return web.Response(status=404)
 
+async def api_sale_add(request):
+    """POST /webapp/api/sale/add {initData, game, price, photo_base64} —
+    Web App ichidan to'g'ridan-to'g'ri savdo e'loni yaratadi (chatga chiqmasdan)."""
+    try:
+        body = await request.json()
+    except Exception:
+        return _cors(web.json_response({"error": "bad_request"}, status=400))
+    tg_user = verify_webapp_initdata(body.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    uname = tg_user.get("username", "")
+    game = body.get("game", "")
+    photo_b64 = body.get("photo_base64", "")
+    try:
+        price = int(body.get("price", 0))
+    except Exception:
+        return _cors(web.json_response({"error": "bad_price"}, status=400))
+
+    if game not in GAME_LABELS:
+        return _cors(web.json_response({"error": "bad_game"}, status=400))
+    if price <= 0:
+        return _cors(web.json_response({"error": "bad_price"}, status=400))
+    if not photo_b64:
+        return _cors(web.json_response({"error": "no_photo"}, status=400))
+
+    try:
+        if "," in photo_b64:
+            photo_b64 = photo_b64.split(",", 1)[1]
+        photo_bytes = base64.b64decode(photo_b64)
+    except Exception:
+        return _cors(web.json_response({"error": "bad_photo"}, status=400))
+
+    try:
+        sent = await bot.send_photo(
+            chat_id=uid,
+            photo=types.BufferedInputFile(photo_bytes, filename="sale.jpg"),
+            caption="🛍️ Web App orqali qo'shilgan savdo e'loni"
+        )
+        file_id = sent.photo[-1].file_id
+    except Exception:
+        return _cors(web.json_response({"error": "photo_upload_failed"}, status=500))
+
+    lang = await get_user_lang(uid)
+    game_label = GAME_LABELS.get(game, game)
+    sid = await add_sale(uid, uname, "", game_label, "", file_id, "so'm", price, lang=lang, game=game)
+
+    return _cors(web.json_response({
+        "success": True,
+        "item": {
+            "id": str(sid),
+            "name": game_label,
+            "price": price,
+            "currency": "so'm",
+            "photo_url": f"/webapp/api/photo/{file_id}",
+            "game": game,
+            "game_label": game_label,
+        }
+    }))
+
 async def api_options(request):
     return _cors(web.Response())
 
@@ -6080,7 +6140,7 @@ async def api_options(request):
 async def _run_health_server():
     """Render 'Web Service' turi uchun port ochib turadigan yengil server.
     Agar 'Background Worker' bo'lsa ham, bu server zarar keltirmaydi."""
-    app = web.Application()
+    app = web.Application(client_max_size=10 * 1024 * 1024)
 
     async def health(request):
         return web.Response(text="OK - bot ishlayapti (polling)")
@@ -6092,6 +6152,7 @@ async def _run_health_server():
     app.router.add_post("/webapp/api/bet", api_crash_bet)
     app.router.add_post("/webapp/api/cashout", api_crash_cashout)
     app.router.add_get("/webapp/api/sales", api_sales)
+    app.router.add_post("/webapp/api/sale/add", api_sale_add)
     app.router.add_get("/webapp/api/photo/{file_id}", api_photo)
     app.router.add_route("OPTIONS", "/webapp/api/{tail:.*}", api_options)
 
