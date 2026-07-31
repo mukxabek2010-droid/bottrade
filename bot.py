@@ -23,6 +23,7 @@ from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
 from aiogram.client.default import DefaultBotProperties
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
 from aiohttp import web
+import aiohttp
 
 # ── AI Yordamchi (userbot) uchun qo'shimcha kutubxonalar ──
 from cryptography.fernet import Fernet
@@ -6036,6 +6037,42 @@ async def api_crash_cashout(request):
     new_bal = await get_balance(uid)
     return _cors(web.json_response({"balance": new_bal}))
 
+async def api_sales(request):
+    """GET /webapp/api/sales — barcha faol e'lonlarni o'yin bo'yicha guruhlab qaytaradi."""
+    items = await active_sales()
+    grouped = {}
+    for it in items:
+        game_key = it.get("game") or "boshqa"
+        grouped.setdefault(game_key, []).append({
+            "id": str(it["_id"]),
+            "name": it.get("name", ""),
+            "price": it.get("price", 0),
+            "currency": it.get("currency", "so'm"),
+            "photo_url": f"/webapp/api/photo/{it['photo_id']}" if it.get("photo_id") else None,
+        })
+    sections = []
+    for key, label in GAME_CATEGORIES:
+        sections.append({"key": key, "label": label, "items": grouped.get(key, [])})
+    if grouped.get("boshqa"):
+        sections.append({"key": "boshqa", "label": "🗂️ Boshqa", "items": grouped["boshqa"]})
+    return _cors(web.json_response({"sections": sections}))
+
+async def api_photo(request):
+    """GET /webapp/api/photo/{file_id} — Telegram fayl serverdan olib, brauzerga uzatadi (tokenni oshkor qilmasdan)."""
+    file_id = request.match_info.get("file_id", "")
+    try:
+        file = await bot.get_file(file_id)
+        url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as resp:
+                if resp.status != 200:
+                    return web.Response(status=404)
+                data = await resp.read()
+                ctype = resp.headers.get("Content-Type", "image/jpeg")
+        return web.Response(body=data, content_type=ctype)
+    except Exception:
+        return web.Response(status=404)
+
 async def api_options(request):
     return _cors(web.Response())
 
@@ -6054,6 +6091,8 @@ async def _run_health_server():
     app.router.add_get("/webapp/api/me", api_me)
     app.router.add_post("/webapp/api/bet", api_crash_bet)
     app.router.add_post("/webapp/api/cashout", api_crash_cashout)
+    app.router.add_get("/webapp/api/sales", api_sales)
+    app.router.add_get("/webapp/api/photo/{file_id}", api_photo)
     app.router.add_route("OPTIONS", "/webapp/api/{tail:.*}", api_options)
 
     # 🏆 Yutuqli o'yin uchun Web App fayllarini xizmat qilish (webapp/index.html)
