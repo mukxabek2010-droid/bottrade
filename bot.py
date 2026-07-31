@@ -3,6 +3,10 @@ import asyncio
 import logging
 import base64
 import hashlib
+import hmac
+import time
+import json
+from urllib.parse import parse_qsl
 import requests
 from io import BytesIO
 from datetime import datetime, timedelta
@@ -517,6 +521,38 @@ async def add_balance(uid, amt):
 
 async def sub_balance(uid, amt):
     await users.update_one({"user_id": uid}, {"$inc": {"balance": -amt}})
+
+async def add_win_balance(uid, amt):
+    """Web App o'yinidagi yutuqlarni balansga qo'shadi (total_deposited ga tegmaydi)."""
+    await users.update_one({"user_id": uid}, {"$inc": {"balance": amt}})
+
+# ═══════════════════════════════════════════════════════
+# TELEGRAM WEB APP — initData tekshiruvi (xavfsizlik uchun)
+# ═══════════════════════════════════════════════════════
+def verify_webapp_initdata(init_data: str):
+    """Telegram tomonidan yuborilgan initData ni HMAC orqali tekshiradi.
+    Muvaffaqiyatli bo'lsa foydalanuvchi dict'ini qaytaradi, aks holda None."""
+    if not init_data or not BOT_TOKEN:
+        return None
+    try:
+        parsed = dict(parse_qsl(init_data, keep_blank_values=True))
+        recv_hash = parsed.pop("hash", None)
+        if not recv_hash:
+            return None
+        data_check_string = "\n".join(f"{k}={v}" for k, v in sorted(parsed.items()))
+        secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+        calc_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(calc_hash, recv_hash):
+            return None
+        auth_date = int(parsed.get("auth_date", 0))
+        if time.time() - auth_date > 86400:
+            return None
+        user_json = parsed.get("user")
+        if not user_json:
+            return None
+        return json.loads(user_json)
+    except Exception:
+        return None
 
 async def users_count():
     return await users.count_documents({})
@@ -5882,6 +5918,32 @@ async def adm_pro_file_wrong(msg: types.Message, state: FSMContext):
 
 
 # ═══════════════════════════════════════════════════════
+# WEB APP (Crash o'yin webapp'idan kelgan tugma bosishlari)
+# ═══════════════════════════════════════════════════════
+@dp.message(F.web_app_data)
+async def on_web_app_data(msg: types.Message, state: FSMContext):
+    try:
+        data = json.loads(msg.web_app_data.data)
+    except Exception:
+        return
+    action = data.get("action")
+    lang = await get_user_lang(msg.from_user.id)
+    if action == "open_sale_add":
+        await cmd_sale_add(msg, state)
+    elif action == "open_deposit":
+        await cmd_deposit(msg, state)
+    elif action == "open_buy":
+        await cmd_buy(msg, state)
+    elif action == "open_referral":
+        await cmd_referral(msg, state)
+    elif action == "open_withdraw":
+        await msg.answer(
+            "🚧 Pul yechish funksiyasi tez orada qo'shiladi." if lang == "uz"
+            else "🚧 Withdraw feature coming soon."
+        )
+
+
+# ═══════════════════════════════════════════════════════
 # POLLING + MAIN
 # (Webhook o'rniga polling ishlatiladi — Render "Background Worker" yoki
 #  "Web Service" bo'lishidan qat'iy nazar ishonchli ishlaydi, chunki
@@ -5908,6 +5970,76 @@ async def on_startup_polling():
     logging.info("✅ Bot polling rejimida ishga tushdi")
 
 
+def _cors(resp):
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+async def api_me(request):
+    """GET /webapp/api/me?initData=... — foydalanuvchining REAL balansini qaytaradi (Mongo'dan)."""
+    init_data = request.query.get("initData", "")
+    tg_user = verify_webapp_initdata(init_data)
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    u = await get_user(uid)
+    if not u:
+        await upsert_user(uid, tg_user.get("username", ""))
+        u = await get_user(uid)
+    ref_count = await get_ref_count(uid)
+    return _cors(web.json_response({
+        "balance": u.get("balance", 0),
+        "total_deposited": u.get("total_deposited", 0),
+        "joined": u.get("joined", ""),
+        "ref_count": ref_count,
+    }))
+
+async def api_crash_bet(request):
+    """POST /webapp/api/bet {initData, amount} — stavkani serverda balansdan yechadi."""
+    try:
+        body = await request.json()
+    except Exception:
+        return _cors(web.json_response({"error": "bad_request"}, status=400))
+    tg_user = verify_webapp_initdata(body.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    try:
+        amount = int(body.get("amount", 0))
+    except Exception:
+        return _cors(web.json_response({"error": "bad_amount"}, status=400))
+    if amount < 1000 or amount > 200000:
+        return _cors(web.json_response({"error": "invalid_amount"}, status=400))
+    bal = await get_balance(uid)
+    if bal < amount:
+        return _cors(web.json_response({"error": "insufficient_balance", "balance": bal}, status=400))
+    await sub_balance(uid, amount)
+    new_bal = await get_balance(uid)
+    return _cors(web.json_response({"balance": new_bal}))
+
+async def api_crash_cashout(request):
+    """POST /webapp/api/cashout {initData, amount} — yutuqni serverda balansga qo'shadi."""
+    try:
+        body = await request.json()
+    except Exception:
+        return _cors(web.json_response({"error": "bad_request"}, status=400))
+    tg_user = verify_webapp_initdata(body.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    try:
+        amount = int(body.get("amount", 0))
+    except Exception:
+        return _cors(web.json_response({"error": "bad_amount"}, status=400))
+    if amount <= 0:
+        return _cors(web.json_response({"error": "invalid_amount"}, status=400))
+    await add_win_balance(uid, amount)
+    new_bal = await get_balance(uid)
+    return _cors(web.json_response({"balance": new_bal}))
+
+async def api_options(request):
+    return _cors(web.Response())
+
+
 async def _run_health_server():
     """Render 'Web Service' turi uchun port ochib turadigan yengil server.
     Agar 'Background Worker' bo'lsa ham, bu server zarar keltirmaydi."""
@@ -5917,6 +6049,13 @@ async def _run_health_server():
         return web.Response(text="OK - bot ishlayapti (polling)")
 
     app.router.add_get("/", health)
+
+    # 🎮 Crash o'yin Web App uchun REAL balans API (statikdan OLDIN ro'yxatdan o'tkaziladi)
+    app.router.add_get("/webapp/api/me", api_me)
+    app.router.add_post("/webapp/api/bet", api_crash_bet)
+    app.router.add_post("/webapp/api/cashout", api_crash_cashout)
+    app.router.add_route("OPTIONS", "/webapp/api/{tail:.*}", api_options)
+
     # 🏆 Yutuqli o'yin uchun Web App fayllarini xizmat qilish (webapp/index.html)
     webapp_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "webapp")
     if os.path.isdir(webapp_dir):
