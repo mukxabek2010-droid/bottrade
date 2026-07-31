@@ -46,7 +46,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(
 BOT_TOKEN         = os.getenv("BOT_TOKEN")
 MONGO_URI         = os.getenv("MONGO_URI")
 
-REQUIRED_CHANNELS = ["@uzbekroblox", "@trade_chanel_uz"]
+REQUIRED_CHANNELS = ["@blox_fruit_uzbekistan_group", "@mafiachat_roblox"]
 TRADE_CHANNEL     = "@trade_chanel_uz"
 CARD_NUMBER       = os.getenv("CARD_NUMBER", "9860080394103636")
 CARD_OWNER        = os.getenv("CARD_OWNER", "Mashrapova.D")
