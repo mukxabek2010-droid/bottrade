@@ -300,23 +300,61 @@
   .msg-row.mine .msg-col{align-items:flex-end;}
   .msg-sender{font-size:10px; font-weight:700; color:var(--gold); margin-left:4px;}
   .msg-bubble{
-    background:rgba(255,255,255,.07); border:1px solid var(--card-line); border-radius:16px 16px 16px 4px;
-    padding:8px 12px; position:relative;
+    background:rgba(255,255,255,.07); border:1px solid var(--card-line); border-radius:17px 17px 17px 4px;
+    padding:8px 12px; position:relative; box-shadow:0 2px 10px rgba(0,0,0,.18);
+    cursor:pointer; transition:transform .12s ease, filter .12s ease; -webkit-tap-highlight-color:transparent;
   }
+  .msg-bubble:active{transform:scale(.97); filter:brightness(1.08);}
   .msg-row.mine .msg-bubble{
-    background:linear-gradient(135deg, rgba(124,92,255,.4), rgba(91,61,240,.4));
-    border-color:rgba(124,92,255,.4); border-radius:16px 16px 4px 16px;
+    background:linear-gradient(135deg, rgba(124,92,255,.55), rgba(91,61,240,.55));
+    border-color:rgba(124,92,255,.4); border-radius:17px 17px 4px 17px;
   }
-  .msg-text{font-size:13px; line-height:1.4; word-break:break-word; white-space:pre-wrap;}
-  .msg-time{font-size:9px; color:var(--ink-dim); margin-top:3px; text-align:right;}
+  .msg-text{font-size:13.5px; line-height:1.42; word-break:break-word; white-space:pre-wrap; letter-spacing:.1px;}
+  .msg-time{font-size:9px; color:var(--ink-dim); margin-top:3px; text-align:right; display:flex; align-items:center; justify-content:flex-end; gap:3px;}
   .msg-media{max-width:180px; max-height:220px; border-radius:12px; display:block; margin-bottom:4px;}
   .msg-audio{width:200px; height:32px; margin-bottom:2px;}
 
-  .chat-input-bar{display:flex; align-items:center; gap:6px; flex-shrink:0; padding-top:8px; border-top:1px solid var(--card-line);}
+  /* Stiker (iOS-uslub emoji) xabarlar — bubble'siz, katta ko'rinishda */
+  .msg-row.is-sticker .msg-bubble{background:none; border:none; box-shadow:none; padding:0;}
+  .msg-sticker-emoji{
+    font-size:58px; line-height:1; display:block; filter:drop-shadow(0 3px 6px rgba(0,0,0,.35));
+    animation:stickerPop .32s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes stickerPop{from{transform:scale(.4); opacity:0;} to{transform:scale(1); opacity:1;}}
+  .msg-row.is-sticker .msg-time{margin-top:1px;}
+
+  /* Javob berilgan xabar uchun quote bloki */
+  .msg-reply-quote{
+    display:flex; flex-direction:column; gap:1px; background:rgba(0,0,0,.18);
+    border-left:3px solid var(--gold); border-radius:8px; padding:4px 8px; margin-bottom:5px; max-width:100%;
+  }
+  .msg-row.mine .msg-reply-quote{border-left-color:#fff; background:rgba(0,0,0,.14);}
+  .msg-reply-quote .rq-name{font-size:10.5px; font-weight:800; color:var(--gold);}
+  .msg-row.mine .msg-reply-quote .rq-name{color:#ffe9b3;}
+  .msg-reply-quote .rq-text{font-size:11px; color:var(--ink-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+
+  /* Xabarga javob berish paneli (input ustida) */
+  .reply-bar{
+    display:none; align-items:center; gap:8px; background:rgba(124,92,255,.14);
+    border:1px solid rgba(124,92,255,.35); border-radius:12px; padding:6px 8px; margin-bottom:6px; flex-shrink:0;
+  }
+  .reply-bar.show{display:flex;}
+  .reply-bar-bar{width:3px; align-self:stretch; background:var(--violet); border-radius:2px; flex-shrink:0;}
+  .reply-bar-body{flex:1; min-width:0;}
+  .reply-bar-title{font-size:10.5px; font-weight:800; color:var(--violet); display:flex; align-items:center; gap:4px;}
+  .reply-bar-text{font-size:11.5px; color:var(--ink-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .reply-bar-close{
+    width:22px; height:22px; border-radius:50%; border:none; background:rgba(255,255,255,.1); color:var(--ink);
+    font-size:13px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+  }
+
+  .chat-input-bar{display:flex; flex-direction:column; gap:0; flex-shrink:0; padding-top:8px; border-top:1px solid var(--card-line);}
+  .chat-input-row{display:flex; align-items:center; gap:6px;}
   .chat-icon-btn{
     width:36px; height:36px; border-radius:12px; border:none; background:rgba(255,255,255,.06);
     color:var(--ink); font-size:16px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
   }
+  .chat-icon-btn.active-toggle{background:linear-gradient(135deg, var(--violet), var(--violet-2)); box-shadow:0 3px 10px rgba(124,92,255,.4);}
   .chat-icon-btn.mic.recording{background:var(--red); animation:recPulse 1s ease-in-out infinite;}
   @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,77,.5);} 50%{box-shadow:0 0 0 8px rgba(255,77,77,0);}}
   .chat-text-input{
@@ -328,6 +366,20 @@
     width:36px; height:36px; border-radius:12px; border:none; flex-shrink:0;
     background:linear-gradient(135deg,var(--gold),var(--gold-2)); color:#1a0f00; font-size:15px; cursor:pointer;
   }
+
+  /* Stiker panel — iOS uslubidagi emoji-stikerlar to'plami */
+  .sticker-panel{
+    display:none; grid-template-columns:repeat(6, 1fr); gap:4px; max-height:150px; overflow-y:auto;
+    background:rgba(255,255,255,.04); border:1px solid var(--card-line); border-radius:14px;
+    padding:8px; margin-bottom:8px; scrollbar-width:none;
+  }
+  .sticker-panel::-webkit-scrollbar{display:none;}
+  .sticker-panel.show{display:grid;}
+  .sticker-item{
+    background:none; border:none; font-size:30px; line-height:1; padding:6px 0; border-radius:10px;
+    cursor:pointer; display:flex; align-items:center; justify-content:center; transition:transform .12s ease, background .12s ease;
+  }
+  .sticker-item:active{transform:scale(.85); background:rgba(255,255,255,.08);}
 
   .contact-view{display:flex; flex-direction:column; flex:1; min-height:0;}
   .contact-list-header{display:flex; align-items:center; justify-content:space-between; padding:2px 4px 8px; font-size:13px; font-weight:800; flex-shrink:0;}
@@ -512,11 +564,23 @@
             </div>
             <div class="msg-list" id="privateMsgList"></div>
             <div class="chat-input-bar">
-              <button class="chat-icon-btn" id="privateAttachBtn">📎</button>
-              <input type="file" id="privateAttachInput" accept="image/*,video/*" style="display:none;">
-              <input type="text" class="chat-text-input" id="privateMsgInput" placeholder="Xabar yozing...">
-              <button class="chat-icon-btn mic" id="privateMicBtn">🎤</button>
-              <button class="chat-send-btn" id="privateSendBtn">➤</button>
+              <div class="reply-bar" id="privateReplyBar">
+                <div class="reply-bar-bar"></div>
+                <div class="reply-bar-body">
+                  <div class="reply-bar-title">↩ Javob: <span id="privateReplyName"></span></div>
+                  <div class="reply-bar-text" id="privateReplyText"></div>
+                </div>
+                <button class="reply-bar-close" id="privateReplyClose">✕</button>
+              </div>
+              <div class="sticker-panel" id="privateStickerPanel"></div>
+              <div class="chat-input-row">
+                <button class="chat-icon-btn" id="privateAttachBtn">📎</button>
+                <input type="file" id="privateAttachInput" accept="image/*,video/*" style="display:none;">
+                <button class="chat-icon-btn" id="privateStickerBtn">😊</button>
+                <input type="text" class="chat-text-input" id="privateMsgInput" placeholder="Xabar yozing...">
+                <button class="chat-icon-btn mic" id="privateMicBtn">🎤</button>
+                <button class="chat-send-btn" id="privateSendBtn">➤</button>
+              </div>
             </div>
           </div>
         </div>
@@ -525,11 +589,23 @@
         <div class="chat-subpanel" id="chatsub-global">
           <div class="msg-list" id="globalMsgList"></div>
           <div class="chat-input-bar">
-            <button class="chat-icon-btn" id="globalAttachBtn">📎</button>
-            <input type="file" id="globalAttachInput" accept="image/*,video/*" style="display:none;">
-            <input type="text" class="chat-text-input" id="globalMsgInput" placeholder="Xabar yozing...">
-            <button class="chat-icon-btn mic" id="globalMicBtn">🎤</button>
-            <button class="chat-send-btn" id="globalSendBtn">➤</button>
+            <div class="reply-bar" id="globalReplyBar">
+              <div class="reply-bar-bar"></div>
+              <div class="reply-bar-body">
+                <div class="reply-bar-title">↩ Javob: <span id="globalReplyName"></span></div>
+                <div class="reply-bar-text" id="globalReplyText"></div>
+              </div>
+              <button class="reply-bar-close" id="globalReplyClose">✕</button>
+            </div>
+            <div class="sticker-panel" id="globalStickerPanel"></div>
+            <div class="chat-input-row">
+              <button class="chat-icon-btn" id="globalAttachBtn">📎</button>
+              <input type="file" id="globalAttachInput" accept="image/*,video/*" style="display:none;">
+              <button class="chat-icon-btn" id="globalStickerBtn">😊</button>
+              <input type="text" class="chat-text-input" id="globalMsgInput" placeholder="Xabar yozing...">
+              <button class="chat-icon-btn mic" id="globalMicBtn">🎤</button>
+              <button class="chat-send-btn" id="globalSendBtn">➤</button>
+            </div>
           </div>
         </div>
       </div>
@@ -905,16 +981,23 @@
   });
 
   // ══════════ TAB NAVIGATION ══════════
+  function switchNavTab(tabName){
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+    document.getElementById('panel-' + tabName).classList.add('active');
+    const targetBtn = document.querySelector('.nav-btn[data-tab="' + tabName + '"]');
+    if (targetBtn) targetBtn.classList.add('active');
+    activeTab = tabName;
+    saleFab.style.display = (tabName === 'sale') ? 'flex' : 'none';
+    if (tabName === 'sale') loadSales();
+    window.dispatchEvent(new CustomEvent('navtabchange', { detail: { tab: tabName } }));
+  }
+  window.switchNavTab = switchNavTab;
+
   document.querySelectorAll('.nav-btn').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       haptic('light');
-      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
-      document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
-      btn.classList.add('active');
-      activeTab = btn.dataset.tab;
-      saleFab.style.display = (btn.dataset.tab === 'sale') ? 'flex' : 'none';
-      if (btn.dataset.tab === 'sale') loadSales();
+      switchNavTab(btn.dataset.tab);
     });
   });
 
@@ -1300,29 +1383,56 @@
         r.readAsDataURL(file);
       });
     }
+    // iOS-uslub emoji-stikerlar to'plami (Apple emoji shrifti orqali iPhone'da
+    // avtomatik ravishda Apple stiker dizayni bilan chiqadi)
+    const STICKER_SET = ['😂','❤️','🔥','👍','😍','😢','😮','🙏','🎉','😎','🥳','👏','😅','🤔','😴','💯','🤝','👀','🙌','😡','🥺','😴','🤩','💀'];
+
     function renderMediaHtml(m){
       if (m.media_type === 'photo') return `<img class="msg-media" src="${m.media_url}" alt="">`;
       if (m.media_type === 'video') return `<video class="msg-media" src="${m.media_url}" controls playsinline></video>`;
       if (m.media_type === 'voice') return `<audio class="msg-audio" src="${m.media_url}" controls></audio>`;
       return '';
     }
+    function replyQuoteHtml(r){
+      if (!r) return '';
+      let preview = r.text ? escapeHtml(r.text) : '';
+      if (!preview && r.media_type === 'sticker') preview = '😊 Stiker';
+      else if (!preview && r.media_type === 'photo') preview = '📷 Rasm';
+      else if (!preview && r.media_type === 'video') preview = '🎬 Video';
+      else if (!preview && r.media_type === 'voice') preview = '🎤 Ovozli xabar';
+      return `
+        <div class="msg-reply-quote">
+          <div class="rq-name">${escapeHtml(r.name || 'Foydalanuvchi')}</div>
+          <div class="rq-text">${preview}</div>
+        </div>
+      `;
+    }
     function renderMessage(m, container, showAvatar){
       const mine = String(m.user_id) === String(myId);
+      const isSticker = m.media_type === 'sticker';
       const row = document.createElement('div');
-      row.className = 'msg-row ' + (mine ? 'mine' : 'theirs');
+      row.className = 'msg-row ' + (mine ? 'mine' : 'theirs') + (isSticker ? ' is-sticker' : '');
+      row.dataset.ts = m.ts || '';
+      row.dataset.name = m.name || 'Foydalanuvchi';
+      row.dataset.text = m.text || '';
+      row.dataset.mediaType = m.media_type || '';
       let avatarHtml = '';
       if (showAvatar && !mine) {
         avatarHtml = `<div class="msg-avatar">${m.photo_url ? `<img src="${m.photo_url}" alt="">` : escapeHtml((m.name||'?')[0])}</div>`;
       }
+      const bodyHtml = isSticker
+        ? `<span class="msg-sticker-emoji">${escapeHtml(m.media_url || '😊')}</span><div class="msg-time">${timeAgo(m.ts)}</div>`
+        : `
+            ${replyQuoteHtml(m.reply_to)}
+            ${m.media_type ? renderMediaHtml(m) : ''}
+            ${m.text ? `<div class="msg-text">${escapeHtml(m.text)}</div>` : ''}
+            <div class="msg-time">${timeAgo(m.ts)}</div>
+          `;
       row.innerHTML = `
         ${avatarHtml}
         <div class="msg-col">
           ${showAvatar && !mine ? `<div class="msg-sender">${escapeHtml(m.name || 'Foydalanuvchi')}</div>` : ''}
-          <div class="msg-bubble">
-            ${m.media_type ? renderMediaHtml(m) : ''}
-            ${m.text ? `<div class="msg-text">${escapeHtml(m.text)}</div>` : ''}
-            <div class="msg-time">${timeAgo(m.ts)}</div>
-          </div>
+          <div class="msg-bubble">${bodyHtml}</div>
         </div>
       `;
       container.appendChild(row);
@@ -1342,11 +1452,9 @@
     });
 
     // Asosiy pastki navbar 'Chat' bo'limiga o'tilganda/chiqilganda polling boshqaruvi
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (btn.dataset.tab === 'chat') manageChatPolling();
-        else { clearInterval(globalPollTimer); clearInterval(privatePollTimer); }
-      });
+    window.addEventListener('navtabchange', (e) => {
+      if (e.detail.tab === 'chat') manageChatPolling();
+      else { clearInterval(globalPollTimer); clearInterval(privatePollTimer); }
     });
 
     function manageChatPolling(){
@@ -1378,9 +1486,59 @@
       } catch(e){}
     }
 
+    // ── XABARGA JAVOB BERISH (reply) holati ──
+    const replyState = { global: null, private: null };
+    const replyBarEls = {
+      global: { bar: document.getElementById('globalReplyBar'), name: document.getElementById('globalReplyName'), text: document.getElementById('globalReplyText'), close: document.getElementById('globalReplyClose') },
+      private: { bar: document.getElementById('privateReplyBar'), name: document.getElementById('privateReplyName'), text: document.getElementById('privateReplyText'), close: document.getElementById('privateReplyClose') },
+    };
+    function replyPreviewText(data){
+      if (data.text) return data.text;
+      if (data.mediaType === 'sticker') return '😊 Stiker';
+      if (data.mediaType === 'photo') return '📷 Rasm';
+      if (data.mediaType === 'video') return '🎬 Video';
+      if (data.mediaType === 'voice') return '🎤 Ovozli xabar';
+      return 'Xabar';
+    }
+    function setReply(target, data){
+      replyState[target] = data;
+      const els = replyBarEls[target];
+      els.name.textContent = data.name;
+      els.text.textContent = replyPreviewText(data);
+      els.bar.classList.add('show');
+      haptic('light');
+    }
+    function clearReply(target){
+      replyState[target] = null;
+      replyBarEls[target].bar.classList.remove('show');
+    }
+    replyBarEls.global.close.addEventListener('click', () => clearReply('global'));
+    replyBarEls.private.close.addEventListener('click', () => clearReply('private'));
+
+    function attachReplyTap(container, target){
+      container.addEventListener('click', (e) => {
+        const bubble = e.target.closest('.msg-bubble');
+        if (!bubble) return;
+        const row = bubble.closest('.msg-row');
+        if (!row || !row.dataset.ts) return;
+        setReply(target, {
+          ts: Number(row.dataset.ts),
+          name: row.dataset.name || 'Foydalanuvchi',
+          text: row.dataset.text || '',
+          mediaType: row.dataset.mediaType || null,
+        });
+      });
+    }
+    attachReplyTap(globalMsgList, 'global');
+    attachReplyTap(privateMsgList, 'private');
+
     async function sendMessage(target, text, mediaType, mediaBase64){
       if (!tg || !tg.initData) { alert("Bu funksiya faqat Telegram ichida ishlaydi."); return; }
       const payload = { initData: tg.initData, text: text || '', media_type: mediaType || null, media_base64: mediaBase64 || null };
+      const activeReply = replyState[target];
+      if (activeReply) {
+        payload.reply_to = { ts: activeReply.ts, name: activeReply.name, text: activeReply.text, media_type: activeReply.mediaType };
+      }
       let url = '/webapp/api/chat/global/send';
       if (target === 'private') {
         if (!activePeer) return;
@@ -1392,6 +1550,7 @@
         const d = await res.json();
         if (!res.ok || d.error) { alert("Xatolik: " + (d.error || res.status)); return; }
         haptic('light');
+        clearReply(target);
         if (target === 'global') {
           const emptyMsg = globalMsgList.querySelector('.chat-empty'); if (emptyMsg) globalMsgList.innerHTML = '';
           renderMessage(d.message, globalMsgList, true);
@@ -1405,6 +1564,28 @@
         }
       } catch(e){ alert("Tarmoq xatosi, qayta urinib ko'ring."); }
     }
+
+    // ── STIKER PANELI ──
+    function setupStickerPanel(panelId, btnId, target){
+      const panel = document.getElementById(panelId);
+      const btn = document.getElementById(btnId);
+      panel.innerHTML = STICKER_SET.map(s => `<button class="sticker-item" data-emoji="${s}">${s}</button>`).join('');
+      btn.addEventListener('click', () => {
+        haptic('light');
+        panel.classList.toggle('show');
+        btn.classList.toggle('active-toggle', panel.classList.contains('show'));
+      });
+      panel.querySelectorAll('.sticker-item').forEach(el => {
+        el.addEventListener('click', () => {
+          haptic('medium');
+          sendMessage(target, '', 'sticker', el.dataset.emoji);
+          panel.classList.remove('show');
+          btn.classList.remove('active-toggle');
+        });
+      });
+    }
+    setupStickerPanel('globalStickerPanel', 'globalStickerBtn', 'global');
+    setupStickerPanel('privateStickerPanel', 'privateStickerBtn', 'private');
 
     document.getElementById('globalSendBtn').addEventListener('click', () => {
       const inp = document.getElementById('globalMsgInput');
@@ -1503,6 +1684,7 @@
       else { img.style.display = 'none'; fb.style.display = 'flex'; fb.textContent = (contact.name || '?')[0]; }
       privateMsgList.innerHTML = '';
       lastPrivateTs = 0;
+      clearReply('private');
       privateThreadView.classList.add('open');
       haptic('light');
       manageChatPolling();
@@ -1511,6 +1693,7 @@
     document.getElementById('threadBackBtn').addEventListener('click', () => {
       privateThreadView.classList.remove('open');
       activePeer = null;
+      clearReply('private');
       clearInterval(privatePollTimer);
       loadContacts();
     });
@@ -1576,6 +1759,27 @@
       } catch(e){ alert("Tarmoq xatosi, qayta urinib ko'ring."); }
       finally { btn.disabled = false; btn.textContent = "Qo'shish"; }
     });
+
+    // ── BOT BILDIRISHNOMASIDAGI "👀 Ko'rish" TUGMASI ORQALI CHATNI AVTO-OCHISH ──
+    // Bot foydalanuvchiga yozilgan xabar haqida xabar yuborganda, Web App URL'ga
+    // ?open_chat=<yozgan odamning ID'si> parametri qo'shib beradi. Shu parametr
+    // bo'lsa, avtomatik ravishda Chat bo'limi -> Shaxsiy chat -> o'sha suhbat ochiladi.
+    async function openChatFromDeepLink(){
+      const params = new URLSearchParams(window.location.search);
+      const openChatId = params.get('open_chat');
+      if (!openChatId || !tg || !tg.initData) return;
+      try {
+        const res = await fetch('/webapp/api/chat/peer?initData=' + encodeURIComponent(tg.initData) + '&peer_id=' + encodeURIComponent(openChatId));
+        const d = await res.json();
+        if (!res.ok || d.error || !d.contact) return;
+        window.switchNavTab('chat');
+        document.querySelector('.chat-tab[data-chattab="private"]').click();
+        if (!contactsCache.find(x => String(x.user_id) === String(d.contact.user_id))) contactsCache.unshift(d.contact);
+        renderContacts();
+        openThread(d.contact);
+      } catch(e){}
+    }
+    openChatFromDeepLink();
   })();
 
 })();
