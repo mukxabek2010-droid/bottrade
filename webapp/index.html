@@ -242,6 +242,7 @@
     background:rgba(255,255,255,.03);
   }
   .sale-photo-box img{width:100%; height:100%; object-fit:cover;}
+  #salePhotoPreview{width:100%; height:100%; display:flex; align-items:center; justify-content:center;}
   .sale-select, .sale-price-input{
     width:100%; background:rgba(255,255,255,.06); border:1px solid var(--card-line); border-radius:14px;
     padding:12px 14px; color:var(--ink); font-family:'Manrope',sans-serif; font-weight:700; font-size:14px;
@@ -367,7 +368,7 @@
     <div class="sale-modal">
       <h3>Savdo qo'shish</h3>
       <div class="sale-photo-box" id="salePhotoBox">
-        <span id="salePhotoLabel">📷 Rasm tanlash uchun bosing</span>
+        <div id="salePhotoPreview"><span id="salePhotoLabel">📷 Rasm tanlash uchun bosing</span></div>
         <input type="file" accept="image/*" id="salePhotoInput" style="display:none;">
       </div>
       <select class="sale-select" id="saleGameSelect">
@@ -570,25 +571,85 @@
     const reader = new FileReader();
     reader.onload = (e) => {
       salePhotoDataUrl = e.target.result;
-      salePhotoBox.innerHTML = `<img src="${salePhotoDataUrl}" alt="">`;
+      document.getElementById('salePhotoPreview').innerHTML = `<img src="${salePhotoDataUrl}" alt="">`;
     };
     reader.readAsDataURL(file);
   });
 
-  saleSubmitBtn.addEventListener('click', () => {
+  saleSubmitBtn.addEventListener('click', async () => {
     const game = saleGameSelect.value;
     const price = parseInt(salePriceInput.value, 10);
     if (!salePhotoDataUrl) { alert("Iltimos, rasm tanlang!"); return; }
     if (!game) { alert("Iltimos, o'yinni tanlang!"); return; }
     if (!price || price <= 0) { alert("Narxni to'g'ri kiriting!"); return; }
-    if (!tg) { alert("Bu funksiya faqat Telegram ichida ishlaydi."); return; }
+    if (!tg || !tg.initData) { alert("Bu funksiya faqat Telegram ichida ishlaydi."); return; }
+
     haptic('medium');
-    // Bot chatiga o'tkazamiz: bot mavjud "Sotish qo'shish" oqimini (o'yin tanlash bosqichidan) davom ettiradi,
-    // rasm va narxni foydalanuvchi keyingi xabarlarda chatda yuboradi.
-    tg.sendData(JSON.stringify({ action: 'open_sale_add', game: game, price: price }));
-    saleModalBackdrop.classList.remove('show');
-    tg.close();
+    saleSubmitBtn.disabled = true;
+    saleSubmitBtn.textContent = "Yuklanmoqda...";
+    try {
+      const res = await fetch('/webapp/api/sale/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          initData: tg.initData,
+          game: game,
+          price: price,
+          photo_base64: salePhotoDataUrl
+        })
+      });
+      const d = await res.json();
+      if (!res.ok || d.error) {
+        alert("Xatolik yuz berdi: " + (d.error || res.status));
+        return;
+      }
+      // Modalni yopish va formani tozalash
+      saleModalBackdrop.classList.remove('show');
+      salePhotoDataUrl = null;
+      document.getElementById('salePhotoPreview').innerHTML = '<span id="salePhotoLabel">📷 Rasm tanlash uchun bosing</span>';
+      salePhotoInput.value = '';
+      saleGameSelect.value = '';
+      salePriceInput.value = '';
+      // Yangi e'lonni darhol, o'sha yerning o'zida ro'yxatga qo'shamiz
+      prependSaleItem(d.item);
+      haptic('heavy');
+    } catch (e) {
+      alert("Tarmoq xatosi, qayta urinib ko'ring.");
+    } finally {
+      saleSubmitBtn.disabled = false;
+      saleSubmitBtn.textContent = "Yuborish";
+    }
   });
+
+  function prependSaleItem(item){
+    if (!item) { loadSales(); return; }
+    const emptyMsg = saleList.querySelector('.sale-empty');
+    if (emptyMsg) saleList.innerHTML = '';
+
+    let section = saleList.querySelector(`[data-game-key="${item.game}"]`);
+    const itemHtml = `
+      <div class="sale-item">
+        <img src="${item.photo_url}" alt="">
+        <div class="s-info">
+          <div class="s-name">${item.name || 'Nomsiz item'}</div>
+          <div class="s-game">${item.game_label || ''}</div>
+          <div class="s-price">${fmtSom(item.price)} so'm</div>
+        </div>
+      </div>`;
+
+    if (section) {
+      const countEl = section.querySelector('.sale-section-count');
+      if (countEl) countEl.textContent = (parseInt(countEl.textContent, 10) || 0) + 1;
+      section.insertAdjacentHTML('beforeend', itemHtml);
+    } else {
+      const sectionHtml = `
+        <div class="sale-section" data-game-key="${item.game}">
+          <div class="sale-section-title">${item.game_label || ''} <span class="sale-section-count">1</span></div>
+          ${itemHtml}
+        </div>`;
+      saleList.insertAdjacentHTML('afterbegin', sectionHtml);
+    }
+  }
 
   // Depozit ochish Action
   document.getElementById('topupBtn').addEventListener('click', function(){
@@ -600,10 +661,11 @@
 
   // ══════════ SOUND FX ENGINE ══════════
   let soundEnabled = true;
+  let activeTab = 'game'; // Faol bo'lim: shu bo'limda bo'lmasa, o'sha bo'limga tegishli tovush chiqmaydi
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
   function playEngineSound(freq) {
-    if (!soundEnabled || audioCtx.state === 'suspended') return;
+    if (!soundEnabled || activeTab !== 'game' || audioCtx.state === 'suspended') return;
     try {
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
@@ -617,7 +679,7 @@
   }
 
   function playWinSound() {
-    if (!soundEnabled) return;
+    if (!soundEnabled || activeTab !== 'game') return;
     try {
       const now = audioCtx.currentTime;
       const osc = audioCtx.createOscillator();
@@ -634,7 +696,7 @@
   }
 
   function playExplosionSound() {
-    if (!soundEnabled) return;
+    if (!soundEnabled || activeTab !== 'game') return;
     try {
       const now = audioCtx.currentTime;
       const osc = audioCtx.createOscillator();
@@ -663,6 +725,7 @@
       document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
       document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
       btn.classList.add('active');
+      activeTab = btn.dataset.tab;
       saleFab.style.display = (btn.dataset.tab === 'sale') ? 'flex' : 'none';
       if (btn.dataset.tab === 'sale') loadSales();
     });
