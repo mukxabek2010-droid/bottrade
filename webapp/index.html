@@ -248,6 +248,126 @@
     padding:12px 14px; color:var(--ink); font-family:'Manrope',sans-serif; font-weight:700; font-size:14px;
   }
   .sale-select:focus, .sale-price-input:focus{outline:none; border-color:var(--gold);}
+
+  /* ══════════ CHAT MODULE ══════════ */
+  .chat-card{
+    height:calc(100vh - 230px); min-height:440px;
+    display:flex; flex-direction:column; padding:10px; position:relative; overflow:hidden;
+  }
+  .chat-card::before{
+    content:''; position:absolute; top:-70px; left:50%; transform:translateX(-50%);
+    width:300px; height:190px; border-radius:50%;
+    background:radial-gradient(circle, rgba(124,92,255,.35), transparent 70%);
+    filter:blur(32px); animation:haloPulse 5s ease-in-out infinite; pointer-events:none; z-index:0;
+  }
+  @keyframes haloPulse{
+    0%,100%{opacity:.45; transform:translateX(-50%) scale(1);}
+    50%{opacity:.9; transform:translateX(-50%) scale(1.18);}
+  }
+
+  .chat-tabs{
+    position:relative; z-index:2; display:flex; gap:6px; background:rgba(255,255,255,.05);
+    border:1px solid var(--card-line); border-radius:16px; padding:4px; margin-bottom:10px; flex-shrink:0;
+  }
+  .chat-tab{
+    flex:1; border:none; background:transparent; color:var(--ink-dim); font-family:'Manrope',sans-serif;
+    font-weight:700; font-size:13px; padding:10px 8px; border-radius:12px; cursor:pointer; transition:.25s;
+    position:relative; overflow:hidden;
+  }
+  .chat-tab.active{
+    color:#fff; background:linear-gradient(135deg, var(--violet), var(--violet-2));
+    box-shadow:0 4px 16px rgba(124,92,255,.4);
+  }
+  .chat-tab.active::after{
+    content:''; position:absolute; inset:0;
+    background:linear-gradient(120deg, transparent 30%, rgba(255,255,255,.25) 50%, transparent 70%);
+    background-size:200% 100%; animation:chatShimmer 2.6s linear infinite;
+  }
+  @keyframes chatShimmer{0%{background-position:200% 0;} 100%{background-position:-200% 0;}}
+
+  .chat-subpanel{display:none; flex-direction:column; flex:1; min-height:0; position:relative; z-index:2;}
+  .chat-subpanel.active{display:flex;}
+  .chat-empty{text-align:center; color:var(--ink-dim); font-size:12px; padding:40px 10px;}
+
+  .msg-list{flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:10px; padding:6px 2px 10px; scrollbar-width:none;}
+  .msg-list::-webkit-scrollbar{display:none;}
+  .msg-row{display:flex; gap:8px; align-items:flex-end; animation:msgIn .28s ease;}
+  @keyframes msgIn{from{opacity:0; transform:translateY(8px);} to{opacity:1; transform:translateY(0);}}
+  .msg-row.mine{flex-direction:row-reverse;}
+  .msg-avatar{width:28px; height:28px; border-radius:50%; flex-shrink:0; background:var(--violet-2); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; overflow:hidden;}
+  .msg-avatar img{width:100%; height:100%; object-fit:cover;}
+  .msg-col{max-width:74%; display:flex; flex-direction:column; gap:2px;}
+  .msg-row.mine .msg-col{align-items:flex-end;}
+  .msg-sender{font-size:10px; font-weight:700; color:var(--gold); margin-left:4px;}
+  .msg-bubble{
+    background:rgba(255,255,255,.07); border:1px solid var(--card-line); border-radius:16px 16px 16px 4px;
+    padding:8px 12px; position:relative;
+  }
+  .msg-row.mine .msg-bubble{
+    background:linear-gradient(135deg, rgba(124,92,255,.4), rgba(91,61,240,.4));
+    border-color:rgba(124,92,255,.4); border-radius:16px 16px 4px 16px;
+  }
+  .msg-text{font-size:13px; line-height:1.4; word-break:break-word; white-space:pre-wrap;}
+  .msg-time{font-size:9px; color:var(--ink-dim); margin-top:3px; text-align:right;}
+  .msg-media{max-width:180px; max-height:220px; border-radius:12px; display:block; margin-bottom:4px;}
+  .msg-audio{width:200px; height:32px; margin-bottom:2px;}
+
+  .chat-input-bar{display:flex; align-items:center; gap:6px; flex-shrink:0; padding-top:8px; border-top:1px solid var(--card-line);}
+  .chat-icon-btn{
+    width:36px; height:36px; border-radius:12px; border:none; background:rgba(255,255,255,.06);
+    color:var(--ink); font-size:16px; display:flex; align-items:center; justify-content:center; cursor:pointer; flex-shrink:0;
+  }
+  .chat-icon-btn.mic.recording{background:var(--red); animation:recPulse 1s ease-in-out infinite;}
+  @keyframes recPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,77,77,.5);} 50%{box-shadow:0 0 0 8px rgba(255,77,77,0);}}
+  .chat-text-input{
+    flex:1; background:rgba(255,255,255,.06); border:1px solid var(--card-line); border-radius:14px;
+    padding:9px 14px; color:var(--ink); font-family:'Manrope',sans-serif; font-size:13px; min-width:0;
+  }
+  .chat-text-input:focus{outline:none; border-color:var(--violet);}
+  .chat-send-btn{
+    width:36px; height:36px; border-radius:12px; border:none; flex-shrink:0;
+    background:linear-gradient(135deg,var(--gold),var(--gold-2)); color:#1a0f00; font-size:15px; cursor:pointer;
+  }
+
+  .contact-view{display:flex; flex-direction:column; flex:1; min-height:0;}
+  .contact-list-header{display:flex; align-items:center; justify-content:space-between; padding:2px 4px 8px; font-size:13px; font-weight:800; flex-shrink:0;}
+  .add-contact-btn{
+    width:30px; height:30px; border-radius:10px; border:none; background:linear-gradient(135deg,var(--gold),var(--gold-2));
+    color:#1a0f00; font-size:18px; font-weight:800; cursor:pointer;
+  }
+  .contact-list{flex:1; overflow-y:auto; display:flex; flex-direction:column; gap:6px; scrollbar-width:none;}
+  .contact-list::-webkit-scrollbar{display:none;}
+  .contact-item{
+    display:flex; align-items:center; gap:10px; background:rgba(255,255,255,.04); border:1px solid var(--card-line);
+    border-radius:14px; padding:9px 10px; cursor:pointer; transition:.15s;
+  }
+  .contact-item:active{background:rgba(255,255,255,.1);}
+  .contact-avatar{
+    width:40px; height:40px; border-radius:50%; flex-shrink:0; background:var(--violet-2); overflow:hidden;
+    display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px;
+    box-shadow:0 0 0 2px rgba(124,92,255,.35);
+  }
+  .contact-avatar img{width:100%; height:100%; object-fit:cover;}
+  .contact-info{flex:1; min-width:0;}
+  .contact-name{font-size:13px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .contact-last{font-size:11px; color:var(--ink-dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .contact-time{font-size:10px; color:var(--ink-dim); flex-shrink:0;}
+
+  .thread-view{
+    position:absolute; inset:10px; z-index:5; display:flex; flex-direction:column;
+    background:var(--bg-mid); border-radius:16px; border:1px solid var(--card-line);
+    padding:10px; transform:translateX(100%); opacity:0; pointer-events:none;
+    transition:transform .3s ease, opacity .3s ease;
+  }
+  .thread-view.open{transform:translateX(0); opacity:1; pointer-events:auto;}
+  .thread-header{display:flex; align-items:center; gap:10px; padding-bottom:8px; border-bottom:1px solid var(--card-line); margin-bottom:6px; flex-shrink:0;}
+  .thread-back{background:none; border:none; color:var(--ink); font-size:20px; cursor:pointer; padding:2px 4px;}
+  .thread-avatar-ring{width:34px; height:34px; border-radius:50%; background:linear-gradient(135deg,var(--gold),var(--violet)); padding:2px; flex-shrink:0;}
+  .thread-avatar-ring img{width:100%; height:100%; border-radius:50%; object-fit:cover; display:none;}
+  .thread-avatar-fb{width:100%; height:100%; border-radius:50%; background:var(--bg-mid); display:flex; align-items:center; justify-content:center; font-weight:800; font-size:12px; color:var(--gold);}
+  .thread-who{min-width:0;}
+  .thread-name{font-size:13px; font-weight:800; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+  .thread-uname{font-size:10px; color:var(--ink-dim);}
 </style>
 </head>
 <body>
@@ -358,6 +478,63 @@
       </div>
     </div>
 
+    <!-- ══════════ 5) CHAT ══════════ -->
+    <div class="panel" id="panel-chat">
+      <div class="card chat-card">
+        <div class="chat-tabs">
+          <button class="chat-tab active" data-chattab="private">👤 Shaxsiy chat</button>
+          <button class="chat-tab" data-chattab="global">🌐 Global chat</button>
+        </div>
+
+        <!-- PRIVATE (SHAXSIY) -->
+        <div class="chat-subpanel active" id="chatsub-private">
+          <div class="contact-view" id="contactListView">
+            <div class="contact-list-header">
+              <span>Suhbatlar</span>
+              <button class="add-contact-btn" id="addContactBtn">+</button>
+            </div>
+            <div class="contact-list" id="contactList">
+              <div class="chat-empty">Hali suhbatlar yo'q. + tugmasi orqali foydalanuvchi qo'shing.</div>
+            </div>
+          </div>
+
+          <div class="thread-view" id="privateThreadView">
+            <div class="thread-header">
+              <button class="thread-back" id="threadBackBtn">←</button>
+              <div class="thread-avatar-ring">
+                <img id="threadAvatarImg" alt="">
+                <div class="thread-avatar-fb" id="threadAvatarFb">?</div>
+              </div>
+              <div class="thread-who">
+                <div class="thread-name" id="threadName">—</div>
+                <div class="thread-uname" id="threadUname"></div>
+              </div>
+            </div>
+            <div class="msg-list" id="privateMsgList"></div>
+            <div class="chat-input-bar">
+              <button class="chat-icon-btn" id="privateAttachBtn">📎</button>
+              <input type="file" id="privateAttachInput" accept="image/*,video/*" style="display:none;">
+              <input type="text" class="chat-text-input" id="privateMsgInput" placeholder="Xabar yozing...">
+              <button class="chat-icon-btn mic" id="privateMicBtn">🎤</button>
+              <button class="chat-send-btn" id="privateSendBtn">➤</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- GLOBAL -->
+        <div class="chat-subpanel" id="chatsub-global">
+          <div class="msg-list" id="globalMsgList"></div>
+          <div class="chat-input-bar">
+            <button class="chat-icon-btn" id="globalAttachBtn">📎</button>
+            <input type="file" id="globalAttachInput" accept="image/*,video/*" style="display:none;">
+            <input type="text" class="chat-text-input" id="globalMsgInput" placeholder="Xabar yozing...">
+            <button class="chat-icon-btn mic" id="globalMicBtn">🎤</button>
+            <button class="chat-send-btn" id="globalSendBtn">➤</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
   <!-- Savdo bo'limida ko'rinadigan qo'shish tugmasi -->
@@ -386,6 +563,15 @@
     </div>
   </div>
 
+  <!-- Foydalanuvchi qo'shish modal (Shaxsiy chat) -->
+  <div class="sale-modal-backdrop" id="addContactModalBackdrop">
+    <div class="sale-modal">
+      <h3>Foydalanuvchi qo'shish</h3>
+      <input type="text" class="sale-price-input" id="addContactUsernameInput" placeholder="@username kiriting">
+      <button class="big-btn gold" id="addContactSubmitBtn">Qo'shish</button>
+      <button class="big-btn" id="addContactCancelBtn" style="background:rgba(255,255,255,.08); color:#fff;">Bekor qilish</button>
+    </div>
+  </div>
 
   <!-- ── NAVBAR ── -->
   <div class="navbar">
@@ -393,6 +579,7 @@
       <button class="nav-btn active" data-tab="crash"><span class="ico">🚀</span><span class="lab">Crash</span></button>
       <button class="nav-btn" data-tab="menu"><span class="ico">☰</span><span class="lab">Menyu</span></button>
       <button class="nav-btn" data-tab="sale"><span class="ico">🛍️</span><span class="lab">Savdo</span></button>
+      <button class="nav-btn" data-tab="chat"><span class="ico">💬</span><span class="lab">Chat</span></button>
       <button class="nav-btn" data-tab="profile"><span class="ico">👤</span><span class="lab">Profil</span></button>
     </div>
   </div>
@@ -1081,6 +1268,315 @@
   }
 
   startEngine();
+
+  // ══════════ CHAT TIZIMI (Shaxsiy + Global) ══════════
+  (function(){
+    const myId = tgUser ? tgUser.id : 0;
+
+    let activeChatTab = 'private';
+    let activePeer = null;
+    let globalPollTimer = null, privatePollTimer = null;
+    let lastGlobalTs = 0, lastPrivateTs = 0;
+    let contactsCache = [];
+
+    const contactListEl = document.getElementById('contactList');
+    const privateThreadView = document.getElementById('privateThreadView');
+    const globalMsgList = document.getElementById('globalMsgList');
+    const privateMsgList = document.getElementById('privateMsgList');
+    const addContactModal = document.getElementById('addContactModalBackdrop');
+
+    function escapeHtml(str){
+      return String(str||'').replace(/[&<>"']/g, s => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]));
+    }
+    function timeAgo(ts){
+      if (!ts) return '';
+      try { return new Date(ts).toLocaleTimeString('uz-UZ', {hour:'2-digit', minute:'2-digit'}); } catch(e){ return ''; }
+    }
+    function fileToBase64(file){
+      return new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+    }
+    function renderMediaHtml(m){
+      if (m.media_type === 'photo') return `<img class="msg-media" src="${m.media_url}" alt="">`;
+      if (m.media_type === 'video') return `<video class="msg-media" src="${m.media_url}" controls playsinline></video>`;
+      if (m.media_type === 'voice') return `<audio class="msg-audio" src="${m.media_url}" controls></audio>`;
+      return '';
+    }
+    function renderMessage(m, container, showAvatar){
+      const mine = String(m.user_id) === String(myId);
+      const row = document.createElement('div');
+      row.className = 'msg-row ' + (mine ? 'mine' : 'theirs');
+      let avatarHtml = '';
+      if (showAvatar && !mine) {
+        avatarHtml = `<div class="msg-avatar">${m.photo_url ? `<img src="${m.photo_url}" alt="">` : escapeHtml((m.name||'?')[0])}</div>`;
+      }
+      row.innerHTML = `
+        ${avatarHtml}
+        <div class="msg-col">
+          ${showAvatar && !mine ? `<div class="msg-sender">${escapeHtml(m.name || 'Foydalanuvchi')}</div>` : ''}
+          <div class="msg-bubble">
+            ${m.media_type ? renderMediaHtml(m) : ''}
+            ${m.text ? `<div class="msg-text">${escapeHtml(m.text)}</div>` : ''}
+            <div class="msg-time">${timeAgo(m.ts)}</div>
+          </div>
+        </div>
+      `;
+      container.appendChild(row);
+    }
+
+    // ── CHAT SUB-TABLAR (Shaxsiy / Global) ──
+    document.querySelectorAll('.chat-tab').forEach(btn => {
+      btn.addEventListener('click', () => {
+        haptic('light');
+        document.querySelectorAll('.chat-tab').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.chat-subpanel').forEach(p => p.classList.remove('active'));
+        btn.classList.add('active');
+        document.getElementById('chatsub-' + btn.dataset.chattab).classList.add('active');
+        activeChatTab = btn.dataset.chattab;
+        manageChatPolling();
+      });
+    });
+
+    // Asosiy pastki navbar 'Chat' bo'limiga o'tilganda/chiqilganda polling boshqaruvi
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.tab === 'chat') manageChatPolling();
+        else { clearInterval(globalPollTimer); clearInterval(privatePollTimer); }
+      });
+    });
+
+    function manageChatPolling(){
+      clearInterval(globalPollTimer); clearInterval(privatePollTimer);
+      if (activeTab !== 'chat') return;
+      if (activeChatTab === 'global') {
+        loadGlobalMessages();
+        globalPollTimer = setInterval(loadGlobalMessages, 3000);
+      } else {
+        loadContacts();
+        if (activePeer) {
+          loadPrivateMessages();
+          privatePollTimer = setInterval(loadPrivateMessages, 3000);
+        }
+      }
+    }
+
+    // ── GLOBAL CHAT ──
+    async function loadGlobalMessages(){
+      if (!tg || !tg.initData) return;
+      try {
+        const res = await fetch('/webapp/api/chat/global?initData=' + encodeURIComponent(tg.initData) + '&after=' + lastGlobalTs);
+        const d = await res.json();
+        const msgs = d.messages || [];
+        if (lastGlobalTs === 0) globalMsgList.innerHTML = '';
+        msgs.forEach(m => { renderMessage(m, globalMsgList, true); lastGlobalTs = Math.max(lastGlobalTs, m.ts || 0); });
+        if (msgs.length) globalMsgList.scrollTop = globalMsgList.scrollHeight;
+        if (globalMsgList.children.length === 0) globalMsgList.innerHTML = '<div class="chat-empty">Hali xabarlar yo\'q. Birinchi bo\'lib yozing!</div>';
+      } catch(e){}
+    }
+
+    async function sendMessage(target, text, mediaType, mediaBase64){
+      if (!tg || !tg.initData) { alert("Bu funksiya faqat Telegram ichida ishlaydi."); return; }
+      const payload = { initData: tg.initData, text: text || '', media_type: mediaType || null, media_base64: mediaBase64 || null };
+      let url = '/webapp/api/chat/global/send';
+      if (target === 'private') {
+        if (!activePeer) return;
+        payload.peer_id = activePeer.user_id;
+        url = '/webapp/api/chat/private/send';
+      }
+      try {
+        const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+        const d = await res.json();
+        if (!res.ok || d.error) { alert("Xatolik: " + (d.error || res.status)); return; }
+        haptic('light');
+        if (target === 'global') {
+          const emptyMsg = globalMsgList.querySelector('.chat-empty'); if (emptyMsg) globalMsgList.innerHTML = '';
+          renderMessage(d.message, globalMsgList, true);
+          globalMsgList.scrollTop = globalMsgList.scrollHeight;
+          lastGlobalTs = Math.max(lastGlobalTs, d.message.ts || 0);
+        } else {
+          renderMessage(d.message, privateMsgList, false);
+          privateMsgList.scrollTop = privateMsgList.scrollHeight;
+          lastPrivateTs = Math.max(lastPrivateTs, d.message.ts || 0);
+          loadContacts();
+        }
+      } catch(e){ alert("Tarmoq xatosi, qayta urinib ko'ring."); }
+    }
+
+    document.getElementById('globalSendBtn').addEventListener('click', () => {
+      const inp = document.getElementById('globalMsgInput');
+      const text = inp.value.trim();
+      if (!text) return;
+      sendMessage('global', text);
+      inp.value = '';
+    });
+    document.getElementById('globalMsgInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('globalSendBtn').click(); });
+    document.getElementById('globalAttachBtn').addEventListener('click', () => document.getElementById('globalAttachInput').click());
+    document.getElementById('globalAttachInput').addEventListener('change', async () => {
+      const inp = document.getElementById('globalAttachInput');
+      const file = inp.files[0];
+      if (!file) return;
+      const b64 = await fileToBase64(file);
+      sendMessage('global', '', file.type.startsWith('video') ? 'video' : 'photo', b64);
+      inp.value = '';
+    });
+
+    // ── OVOZLI XABAR (mikrofon) ──
+    function setupVoiceRecorder(btnId, target){
+      const btn = document.getElementById(btnId);
+      let mediaRecorder = null, chunks = [], recording = false;
+      btn.addEventListener('click', async () => {
+        if (!recording) {
+          if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { alert("Bu qurilmada ovoz yozish qo'llab-quvvatlanmaydi."); return; }
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorder = new MediaRecorder(stream);
+            chunks = [];
+            mediaRecorder.ondataavailable = e => chunks.push(e.data);
+            mediaRecorder.onstop = () => {
+              const blob = new Blob(chunks, { type: 'audio/webm' });
+              const reader = new FileReader();
+              reader.onload = () => sendMessage(target, '', 'voice', reader.result);
+              reader.readAsDataURL(blob);
+              stream.getTracks().forEach(t => t.stop());
+            };
+            mediaRecorder.start();
+            recording = true;
+            btn.classList.add('recording');
+            btn.textContent = '⏹️';
+            haptic('medium');
+          } catch(e) { alert("Mikrofonga ruxsat berilmadi."); }
+        } else {
+          mediaRecorder.stop();
+          recording = false;
+          btn.classList.remove('recording');
+          btn.textContent = '🎤';
+        }
+      });
+    }
+    setupVoiceRecorder('globalMicBtn', 'global');
+    setupVoiceRecorder('privateMicBtn', 'private');
+
+    // ── SHAXSIY CHAT: KONTAKTLAR ──
+    async function loadContacts(){
+      if (!tg || !tg.initData) return;
+      try {
+        const res = await fetch('/webapp/api/chat/contacts?initData=' + encodeURIComponent(tg.initData));
+        const d = await res.json();
+        contactsCache = d.contacts || [];
+        renderContacts();
+      } catch(e){}
+    }
+
+    function renderContacts(){
+      if (contactsCache.length === 0) {
+        contactListEl.innerHTML = '<div class="chat-empty">Hali suhbatlar yo\'q. + tugmasi orqali foydalanuvchi qo\'shing.</div>';
+        return;
+      }
+      contactListEl.innerHTML = contactsCache.map(c => `
+        <div class="contact-item" data-uid="${c.user_id}">
+          <div class="contact-avatar">${c.photo_url ? `<img src="${c.photo_url}" alt="">` : escapeHtml((c.name || '?')[0])}</div>
+          <div class="contact-info">
+            <div class="contact-name">${escapeHtml(c.name || 'Foydalanuvchi')}</div>
+            <div class="contact-last">${escapeHtml(c.last_text || (c.last_media ? '📎 Media' : 'Suhbatni boshlang'))}</div>
+          </div>
+          <div class="contact-time">${timeAgo(c.last_ts)}</div>
+        </div>
+      `).join('');
+      contactListEl.querySelectorAll('.contact-item').forEach(el => {
+        el.addEventListener('click', () => {
+          const c = contactsCache.find(x => String(x.user_id) === String(el.dataset.uid));
+          if (c) openThread(c);
+        });
+      });
+    }
+
+    function openThread(contact){
+      activePeer = contact;
+      document.getElementById('threadName').textContent = contact.name || 'Foydalanuvchi';
+      document.getElementById('threadUname').textContent = contact.username ? ('@' + contact.username) : '';
+      const img = document.getElementById('threadAvatarImg'), fb = document.getElementById('threadAvatarFb');
+      if (contact.photo_url) { img.src = contact.photo_url; img.style.display = 'block'; fb.style.display = 'none'; }
+      else { img.style.display = 'none'; fb.style.display = 'flex'; fb.textContent = (contact.name || '?')[0]; }
+      privateMsgList.innerHTML = '';
+      lastPrivateTs = 0;
+      privateThreadView.classList.add('open');
+      haptic('light');
+      manageChatPolling();
+    }
+
+    document.getElementById('threadBackBtn').addEventListener('click', () => {
+      privateThreadView.classList.remove('open');
+      activePeer = null;
+      clearInterval(privatePollTimer);
+      loadContacts();
+    });
+
+    async function loadPrivateMessages(){
+      if (!tg || !tg.initData || !activePeer) return;
+      try {
+        const res = await fetch('/webapp/api/chat/private?initData=' + encodeURIComponent(tg.initData) + '&peer_id=' + activePeer.user_id + '&after=' + lastPrivateTs);
+        const d = await res.json();
+        const msgs = d.messages || [];
+        msgs.forEach(m => { renderMessage(m, privateMsgList, false); lastPrivateTs = Math.max(lastPrivateTs, m.ts || 0); });
+        if (msgs.length) privateMsgList.scrollTop = privateMsgList.scrollHeight;
+      } catch(e){}
+    }
+
+    document.getElementById('privateSendBtn').addEventListener('click', () => {
+      const inp = document.getElementById('privateMsgInput');
+      const text = inp.value.trim();
+      if (!text || !activePeer) return;
+      sendMessage('private', text);
+      inp.value = '';
+    });
+    document.getElementById('privateMsgInput').addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('privateSendBtn').click(); });
+    document.getElementById('privateAttachBtn').addEventListener('click', () => document.getElementById('privateAttachInput').click());
+    document.getElementById('privateAttachInput').addEventListener('change', async () => {
+      const inp = document.getElementById('privateAttachInput');
+      const file = inp.files[0];
+      if (!file || !activePeer) return;
+      const b64 = await fileToBase64(file);
+      sendMessage('private', '', file.type.startsWith('video') ? 'video' : 'photo', b64);
+      inp.value = '';
+    });
+
+    // ── FOYDALANUVCHI QO'SHISH MODALI ──
+    document.getElementById('addContactBtn').addEventListener('click', () => {
+      haptic('light');
+      document.getElementById('addContactUsernameInput').value = '';
+      addContactModal.classList.add('show');
+    });
+    document.getElementById('addContactCancelBtn').addEventListener('click', () => addContactModal.classList.remove('show'));
+    document.getElementById('addContactSubmitBtn').addEventListener('click', async () => {
+      const uname = document.getElementById('addContactUsernameInput').value.trim().replace(/^@/, '');
+      if (!uname) { alert("Iltimos, username kiriting!"); return; }
+      if (!tg || !tg.initData) { alert("Bu funksiya faqat Telegram ichida ishlaydi."); return; }
+      const btn = document.getElementById('addContactSubmitBtn');
+      btn.disabled = true; btn.textContent = "Qidirilmoqda...";
+      try {
+        const res = await fetch('/webapp/api/chat/contacts/add', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData: tg.initData, username: uname })
+        });
+        const d = await res.json();
+        if (!res.ok || d.error) {
+          alert(d.error === 'not_found' ? "Bunday foydalanuvchi topilmadi." : ("Xatolik: " + (d.error || res.status)));
+          return;
+        }
+        addContactModal.classList.remove('show');
+        haptic('heavy');
+        const c = d.contact;
+        if (!contactsCache.find(x => String(x.user_id) === String(c.user_id))) contactsCache.unshift(c);
+        renderContacts();
+        openThread(c);
+      } catch(e){ alert("Tarmoq xatosi, qayta urinib ko'ring."); }
+      finally { btn.disabled = false; btn.textContent = "Qo'shish"; }
+    });
+  })();
 
 })();
 </script>
