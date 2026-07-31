@@ -1200,12 +1200,9 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_bloxfruit"))
     b.button(text="🤖 AI Yordamchi")
     b.button(text=T(lang, "btn_pro_menu"))
-    if WEBAPP_URL:
-        b.button(text=T(lang, "btn_game"), web_app=WebAppInfo(url=WEBAPP_URL))
-    else:
-        b.button(text=T(lang, "btn_game"))
     b.button(text=T(lang, "btn_change_lang"))
-    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 1)
+    b.button(text=T(lang, "btn_game"))
+    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1)
     return b.as_markup(resize_keyboard=True)
 
 def _as_user_msg(cb: types.CallbackQuery) -> types.Message:
@@ -4461,6 +4458,18 @@ async def cmd_game_not_configured(msg: types.Message, state: FSMContext):
     if not await check_access(msg, state):
         return
     await msg.answer("⚙️ Web App manzili hali sozlanmagan. Iltimos, admin bilan bog'laning.")
+
+@dp.message(F.func(lambda msg: bool(WEBAPP_URL) and any(msg.text == T(l, "btn_game") for l in LANGS)))
+async def cmd_game_open_prompt(msg: types.Message, state: FSMContext):
+    """'Yutuqli o'yin' tugmasi bosilganda o'yinni to'g'ridan-to'g'ri ochmaydi,
+    balki 'Kirish uchun bosing' degan inline tugma bilan xabar yuboradi.
+    (Inline web_app tugmasi barcha Telegram klientlarida initData'ni ishonchli uzatadi.)"""
+    if not await check_access(msg, state):
+        return
+    lang = await get_user_lang(msg.from_user.id)
+    kb = InlineKeyboardBuilder()
+    kb.button(text="🚀 Kirish uchun bosing", web_app=WebAppInfo(url=WEBAPP_URL))
+    await msg.answer("🏆 O'yinga kirish uchun quyidagi tugmani bosing:", reply_markup=kb.as_markup())
 
 # ═══════════════════════════════════════════════════════
 # 🎁 REFERAL BO'LIMI
