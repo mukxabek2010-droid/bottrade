@@ -70,11 +70,48 @@
   .bal-info{display:flex; flex-direction:column; align-items:flex-end;}
   .bal-label{font-size:9px; font-weight:700; color:var(--gold); text-transform:uppercase; letter-spacing:0.5px;}
   .bal-num{font-family:'Space Grotesk',sans-serif; font-weight:800; font-size:14px; color:#fff;}
+  .robux-line{display:flex; align-items:center; gap:3px; margin-top:2px;}
+  .robux-num{font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:11px; color:var(--gold-2);}
   .add-btn{
     width:28px; height:28px; border-radius:10px; border:none;
     background:linear-gradient(135deg,var(--gold),var(--gold-2)); color:#1a0f00;
     font-size:16px; font-weight:800; display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
+  .exchange-btn{
+    width:28px; height:28px; border-radius:10px; border:none;
+    background:linear-gradient(135deg,var(--violet),var(--violet-2)); color:#fff;
+    font-size:14px; font-weight:800; display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .exchange-btn:active{transform:scale(.92);}
+
+  /* ── ROBUX ALMASHTIRISH MODALI ── */
+  .exchange-overlay{
+    position:fixed; inset:0; z-index:9998; display:none;
+    align-items:center; justify-content:center; padding:20px;
+    background:rgba(5,3,12,.72); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px);
+  }
+  .exchange-overlay.show{display:flex;}
+  .exchange-modal{
+    width:100%; max-width:340px; background:var(--bg-mid);
+    border:1px solid var(--card-line); border-radius:20px; padding:18px;
+    box-shadow:0 20px 60px rgba(0,0,0,.5);
+  }
+  .exchange-modal h3{margin:0 0 4px; font-family:'Space Grotesk',sans-serif; font-size:16px; display:flex; align-items:center; gap:6px;}
+  .exchange-modal .sub{font-size:11px; color:var(--ink-dim); margin-bottom:14px;}
+  .exchange-modal input{
+    width:100%; padding:12px; border-radius:12px; border:1px solid var(--card-line);
+    background:rgba(255,255,255,.05); color:var(--ink); font-size:15px; font-family:'Space Grotesk',sans-serif;
+    margin-bottom:6px; outline:none;
+  }
+  .exchange-rate-hint{font-size:11px; color:var(--ink-dim); margin-bottom:14px;}
+  .exchange-rate-hint b{color:var(--gold-2);}
+  .exchange-btn-row{display:flex; gap:8px;}
+  .exchange-btn-row .big-btn{flex:1; padding:12px; font-size:13px;}
+  .exchange-close{
+    position:absolute; top:10px; right:14px; background:none; border:none;
+    color:var(--ink-dim); font-size:20px; cursor:pointer;
+  }
+  .exchange-modal{position:relative;}
 
   /* ── PANELS ── */
   .panel{display:none; flex-direction:column; gap:12px; animation:fadein .2s ease;}
@@ -450,8 +487,26 @@
         <div class="bal-info">
           <span class="bal-label">Balans</span>
           <span class="bal-num" id="headerBalance">— so'm</span>
+          <div class="robux-line">
+            <span>🪙</span><span class="robux-num" id="headerRobux">0</span>
+          </div>
         </div>
+        <button class="exchange-btn" id="exchangeBtn" title="Robux'ga almashtirish">🔄</button>
         <button class="add-btn">+</button>
+      </div>
+    </div>
+
+    <!-- ── ROBUX ALMASHTIRISH MODALI ── -->
+    <div class="exchange-overlay" id="exchangeOverlay">
+      <div class="exchange-modal">
+        <button class="exchange-close" id="exchangeCloseBtn">✕</button>
+        <h3>🔄 Balansni Robux'ga almashtirish</h3>
+        <div class="sub">So'mlik balansingizni Robux'ga aylantiring</div>
+        <input type="number" inputmode="numeric" id="exchangeAmountInput" placeholder="Miqdor (so'm), min 1,000">
+        <div class="exchange-rate-hint" id="exchangeRateHint">Kurs: 1000 so'm = <b>0.01</b> Robux</div>
+        <div class="exchange-btn-row">
+          <button class="big-btn gold" id="exchangeConfirmBtn">Almashtirish</button>
+        </div>
       </div>
     </div>
 
@@ -517,6 +572,7 @@
       </div>
       <div class="stat-grid">
         <div class="stat-box"><div class="lab">💰 Balans</div><div class="val" id="pStatBalance">—</div></div>
+        <div class="stat-box"><div class="lab">🪙 Robux</div><div class="val" id="pStatRobux">—</div></div>
         <div class="stat-box"><div class="lab">📈 Jami kiritilgan</div><div class="val" id="pStatDeposited">—</div></div>
         <div class="stat-box"><div class="lab">📅 Ro'yxatdan o'tgan</div><div class="val" id="pStatJoined">—</div></div>
         <div class="stat-box"><div class="lab">🎁 Referallar</div><div class="val" id="pStatRefs">—</div></div>
@@ -672,6 +728,13 @@
 
   // ══════════ REAL BALANS VA PROFIL INTEGRATSIYASI ══════════
   let currentBalance = 0;
+  let currentRobux = 0;
+  let robuxRatePer1000 = 0.01;
+  function fmtRobux(n){
+    n = Number(n || 0);
+    if (Number.isInteger(n)) return fmt(n);
+    return n.toFixed(4).replace(/0+$/,'').replace(/\.$/,'');
+  }
   const tgUser = (tg && tg.initDataUnsafe && tg.initDataUnsafe.user) ? tg.initDataUnsafe.user : null;
 
   function setAvatar(imgId, fbId, url, fallbackText){
@@ -702,6 +765,11 @@
   function updateBalanceUI() {
     document.getElementById('headerBalance').textContent = fmt(currentBalance) + " so'm";
     document.getElementById('pStatBalance').textContent = fmt(currentBalance) + " so'm";
+    document.getElementById('headerRobux').textContent = fmtRobux(currentRobux);
+    const pRobux = document.getElementById('pStatRobux');
+    if (pRobux) pRobux.textContent = fmtRobux(currentRobux) + " Robux";
+    const hint = document.getElementById('exchangeRateHint');
+    if (hint) hint.innerHTML = `Kurs: 1000 so'm = <b>${fmtRobux(robuxRatePer1000)}</b> Robux`;
   }
 
   // BOT API DANT REAL BALANS VA MA'LUMOTLARNI OLISH
@@ -723,6 +791,8 @@
       }
       const d = await res.json();
       currentBalance = d.balance || 0;
+      currentRobux = d.robux_balance || 0;
+      if (d.robux_rate_per_1000 !== undefined) robuxRatePer1000 = d.robux_rate_per_1000;
       updateBalanceUI();
 
       document.getElementById('pStatDeposited').textContent = fmt(d.total_deposited || 0) + " so'm";
@@ -921,6 +991,72 @@
     tg.sendData(JSON.stringify({ action: 'open_deposit' }));
     tg.close();
   });
+
+  // ══════════ ROBUX'GA ALMASHTIRISH (balans -> Robux) ══════════
+  const exchangeOverlay = document.getElementById('exchangeOverlay');
+  const exchangeBtn = document.getElementById('exchangeBtn');
+  const exchangeAmountInput = document.getElementById('exchangeAmountInput');
+  const exchangeConfirmBtn = document.getElementById('exchangeConfirmBtn');
+  const exchangeCloseBtn = document.getElementById('exchangeCloseBtn');
+
+  if (exchangeBtn) {
+    exchangeBtn.addEventListener('click', function(e){
+      e.stopPropagation(); // topupBtn'ning deposit ochish hodisasi ishga tushmasin
+      haptic('light');
+      exchangeAmountInput.value = '';
+      exchangeOverlay.classList.add('show');
+    });
+  }
+  if (exchangeCloseBtn) {
+    exchangeCloseBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      exchangeOverlay.classList.remove('show');
+    });
+  }
+  if (exchangeOverlay) {
+    exchangeOverlay.addEventListener('click', function(e){
+      if (e.target === exchangeOverlay) exchangeOverlay.classList.remove('show');
+    });
+  }
+  if (exchangeConfirmBtn) {
+    exchangeConfirmBtn.addEventListener('click', async function(e){
+      e.stopPropagation();
+      if (!tg || !tg.initData) { alert('Xatolik: initData topilmadi.'); return; }
+      const amount = parseInt(exchangeAmountInput.value, 10);
+      if (!amount || amount < 1000) {
+        alert("Kamida 1,000 so'm miqdorini kiriting!");
+        return;
+      }
+      if (amount > currentBalance) {
+        alert("Balans yetarli emas!");
+        return;
+      }
+      exchangeConfirmBtn.textContent = '...';
+      try {
+        const res = await fetch('/webapp/api/exchange', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ initData: tg.initData, amount: amount })
+        });
+        const d = await res.json();
+        if (!res.ok || d.error) {
+          if (d.error === 'insufficient_balance') { currentBalance = d.balance; updateBalanceUI(); }
+          alert("Xatolik: almashtirish amalga oshmadi.");
+        } else {
+          currentBalance = d.balance;
+          currentRobux = d.robux_balance;
+          updateBalanceUI();
+          haptic('medium');
+          alert(`✅ ${fmtRobux(d.robux_gained)} Robux hisobingizga qo'shildi!`);
+          exchangeOverlay.classList.remove('show');
+        }
+      } catch(err) {
+        alert("Tarmoq xatosi. Qaytadan urinib ko'ring.");
+      } finally {
+        exchangeConfirmBtn.textContent = 'Almashtirish';
+      }
+    });
+  }
 
   // ══════════ SOUND FX ENGINE ══════════
   let soundEnabled = true;
