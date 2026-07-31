@@ -184,6 +184,7 @@ LANGS = {
         "btn_search": "🔍 Qidiruv",
         "btn_referral": "🎁 Referal",
         "btn_game": "🏆 Yutuqli o'yin",
+        "btn_promo": "🎟 Promokod",
         "btn_change_lang": "🌐 Tilni o'zgartirish",
         "btn_bloxfruit": "🍈 Blox Fruit",
         "sub_msg": "👋 Salom! Botdan foydalanish uchun avval quyidagi kanallarga obuna bo'ling!",
@@ -263,6 +264,7 @@ LANGS = {
         "btn_search": "🔍 Search",
         "btn_referral": "🎁 Referral",
         "btn_game": "🏆 Lucky Game",
+        "btn_promo": "🎟 Promo code",
         "btn_change_lang": "🌐 Change Language",
         "btn_bloxfruit": "🍈 Blox Fruit",
         "sub_msg": "👋 Hello! Please subscribe to all channels to use the bot!",
@@ -342,6 +344,7 @@ LANGS = {
         "btn_search": "🔍 Поиск",
         "btn_referral": "🎁 Реферал",
         "btn_game": "🏆 Игра на удачу",
+        "btn_promo": "🎟 Промокод",
         "btn_change_lang": "🌐 Сменить язык",
         "btn_bloxfruit": "🍈 Blox Fruit",
         "sub_msg": "👋 Привет! Подпишитесь на все каналы, чтобы использовать бот!",
@@ -418,6 +421,7 @@ sale_cart      = mdb["sale_cart"]
 admins_col     = mdb["admins"]
 duels          = mdb["duels"]
 settings_col   = mdb["settings"]
+promocodes_col = mdb["promocodes"]      # promokodlar (bonus balans/robux)
 
 # ── AI Yordamchi uchun kolleksiyalar ──
 userbot_accounts   = mdb["userbot_accounts"]    # ulangan shaxsiy akkauntlar (session'lar shifrlangan holda)
@@ -645,9 +649,16 @@ async def get_deposit(did):
 
 async def approve_deposit(did):
     dep = await deposits.find_one({"_id": ObjectId(str(did))})
+    robux_credited = 0
     if dep:
         await deposits.update_one({"_id": ObjectId(str(did))}, {"$set": {"status": "approved"}})
         await users.update_one({"user_id": dep["user_id"]}, {"$inc": {"balance": dep["amount"], "total_deposited": dep["amount"]}})
+        # Hisob to'ldirilganda avtomatik Robux bonus (admin panelda sozlanadigan kurs bo'yicha)
+        rate = await get_robux_rate()
+        robux_credited = round(dep["amount"] * rate, 4)
+        if robux_credited > 0:
+            await add_robux(dep["user_id"], robux_credited)
+    return robux_credited
 
 async def reject_deposit(did):
     await deposits.update_one({"_id": ObjectId(str(did))}, {"$set": {"status": "rejected"}})
@@ -1007,6 +1018,104 @@ def format_money_sync(amount_uzs: float, lang: str, rates: dict | None = None) -
     return f"{val:,.2f} {symbol}"
 
 # ═══════════════════════════════════════════════════════
+# ROBUX HAMYON TIZIMI (profildagi 2-chi valyuta)
+# Hisob to'ldirish tasdiqlanganda va saytdagi almashtirish tugmasi orqali
+# foydalanuvchi balansi (so'm) avtomatik Robux'ga aylantiriladi.
+# Kurs: "necha so'mga 1 Robux to'g'ri keladi" emas, aksincha
+# "1000 so'mga necha Robux tushishi" — admin panelda sozlanadi.
+# ═══════════════════════════════════════════════════════
+DEFAULT_ROBUX_RATE = 0.00001  # 1 so'm uchun robux miqdori (1000 so'm -> 0.01 Robux)
+
+async def get_robux_rate() -> float:
+    """1 so'm uchun necha Robux berilishini qaytaradi (bazadan, bo'lmasa default)."""
+    try:
+        doc = await settings_col.find_one({"_id": "robux_rate"})
+        if doc and doc.get("rate"):
+            return float(doc["rate"])
+    except Exception:
+        pass
+    return DEFAULT_ROBUX_RATE
+
+async def set_robux_rate(rate_per_1000: float):
+    """Admin panelda '1000 so'mga necha Robux' shaklida kiritiladi, ichkarida 1 so'mlik kursga aylantirib saqlanadi."""
+    rate_per_unit = rate_per_1000 / 1000
+    await settings_col.update_one({"_id": "robux_rate"}, {"$set": {"rate": rate_per_unit}}, upsert=True)
+
+async def get_robux_balance(uid) -> float:
+    u = await users.find_one({"user_id": uid}, {"robux_balance": 1})
+    return (u or {}).get("robux_balance", 0) or 0
+
+async def add_robux(uid, amt):
+    if amt == 0:
+        return
+    await users.update_one({"user_id": uid}, {"$inc": {"robux_balance": amt}}, upsert=True)
+
+async def sub_robux(uid, amt):
+    await users.update_one({"user_id": uid}, {"$inc": {"robux_balance": -amt}})
+
+def fmt_robux(amt) -> str:
+    amt = float(amt or 0)
+    if amt == int(amt):
+        return f"{int(amt):,}"
+    return f"{amt:,.4f}".rstrip("0").rstrip(".")
+
+# ═══════════════════════════════════════════════════════
+# PROMOKODLAR TIZIMI
+# Har bir promokod: kodi, valyutasi (so'm yoki robux), miqdori va
+# nechta odam ishlata olishi (max_uses) admin tomonidan belgilanadi.
+# Bir foydalanuvchi bir promokodni faqat bir marta ishlata oladi.
+# ═══════════════════════════════════════════════════════
+async def create_promo(code: str, currency: str, amount: float, max_uses: int, created_by: int):
+    code = code.strip().upper()
+    doc = {
+        "code": code,
+        "currency": currency,          # "uzs" | "robux"
+        "amount": amount,
+        "max_uses": max_uses,
+        "used_count": 0,
+        "used_users": [],
+        "active": True,
+        "created_by": created_by,
+        "created_at": now(),
+    }
+    await promocodes_col.update_one({"code": code}, {"$set": doc}, upsert=True)
+    return doc
+
+async def get_promo(code: str):
+    return await promocodes_col.find_one({"code": code.strip().upper()})
+
+async def list_promos():
+    return await promocodes_col.find({}).sort("created_at", -1).to_list(length=200)
+
+async def delete_promo(code: str) -> bool:
+    r = await promocodes_col.delete_one({"code": code.strip().upper()})
+    return r.deleted_count > 0
+
+async def redeem_promo(uid: int, code: str) -> dict:
+    """Promokodni foydalanuvchi nomidan ishlatishga urinadi (atomik tekshiruv bilan)."""
+    code = code.strip().upper()
+    promo = await promocodes_col.find_one({"code": code})
+    if not promo or not promo.get("active", True):
+        return {"status": "not_found"}
+    if uid in promo.get("used_users", []):
+        return {"status": "already_used"}
+    if promo.get("used_count", 0) >= promo.get("max_uses", 0):
+        return {"status": "limit_reached"}
+    upd = await promocodes_col.find_one_and_update(
+        {"code": code, "active": True, "used_count": {"$lt": promo["max_uses"]}, "used_users": {"$ne": uid}},
+        {"$inc": {"used_count": 1}, "$push": {"used_users": uid}}
+    )
+    if not upd:
+        return {"status": "limit_reached"}
+    currency = promo.get("currency", "uzs")
+    amount = promo.get("amount", 0)
+    if currency == "robux":
+        await add_robux(uid, amount)
+    else:
+        await users.update_one({"user_id": uid}, {"$inc": {"balance": amount, "total_deposited": amount}})
+    return {"status": "ok", "currency": currency, "amount": amount}
+
+# ═══════════════════════════════════════════════════════
 # BLOX FRUIT BO'LIMI (Stock + Xizmatlar) — sozlamalar
 # ═══════════════════════════════════════════════════════
 DEFAULT_BF_STOCK_CHANNEL = "https://t.me/deltauzbrb"
@@ -1137,6 +1246,21 @@ class AdminCmd(StatesGroup):
 class AdminRoleAdd(StatesGroup):
     user_id = State()
 
+class PromoRedeem(StatesGroup):
+    code = State()
+
+class PromoCreate(StatesGroup):
+    code     = State()
+    currency = State()
+    amount   = State()
+    max_uses = State()
+
+class PromoDelete(StatesGroup):
+    code = State()
+
+class RobuxRateEdit(StatesGroup):
+    rate = State()
+
 class SuggestBot(StatesGroup):
     photo   = State()
     message = State()
@@ -1247,7 +1371,8 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_pro_menu"))
     b.button(text=T(lang, "btn_change_lang"))
     b.button(text=T(lang, "btn_game"))
-    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 1, 1)
+    b.button(text=T(lang, "btn_promo"))
+    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1)
     return b.as_markup(resize_keyboard=True)
 
 def _as_user_msg(cb: types.CallbackQuery) -> types.Message:
@@ -1607,10 +1732,12 @@ async def cmd_profile(msg: types.Message, state: FSMContext):
     b.adjust(1)
     bal_str = await format_money(u.get('balance', 0), lang)
     dep_str = await format_money(u.get('total_deposited', 0), lang)
+    robux_bal = await get_robux_balance(uid)
     await msg.answer(
         f"👤 **Profilingiz**\n\n"
         f"🆔 ID: `{uid}`\n"
         f"💰 Balans: **{bal_str}**\n"
+        f"🪙 Robux: **{fmt_robux(robux_bal)}**\n"
         f"📈 Jami kiritilgan: **{dep_str}**\n"
         f"📅 Ro'yxat: {u.get('joined', '-')}\n\n"
         f"🔄 Faol tradelarim: {len(tr)}\n"
@@ -1662,6 +1789,60 @@ async def cb_my_sales(cb: types.CallbackQuery):
     b.adjust(2, 2)
     await _send_or_edit(cb, s.get("photo_id"), caption, b.as_markup())
     await cb.answer()
+
+# ═══════════════════════════════════════════════════════
+# PROMOKODLAR — foydalanuvchi tomoni
+# ═══════════════════════════════════════════════════════
+@dp.message(F.func(lambda msg: any(msg.text == T(l, "btn_promo") for l in LANGS)))
+async def cmd_promo(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    await msg.answer(
+        "🎟 *Promokodni kiriting:*\n\n"
+        "Promokod orqali balansingizga bonus so'm yoki Robux qo'shilishi mumkin.",
+        reply_markup=cancel_kb(lang)
+    )
+    await state.set_state(PromoRedeem.code)
+
+@dp.message(PromoRedeem.code)
+async def promo_redeem_handler(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    code = (msg.text or "").strip()
+    if not code:
+        await msg.answer("❌ Promokodni matn ko'rinishida yuboring:")
+        return
+    result = await redeem_promo(uid, code)
+    await state.clear()
+    status = result["status"]
+    if status == "ok":
+        currency = result["currency"]
+        amount   = result["amount"]
+        if currency == "robux":
+            await msg.answer(
+                f"🎉 *Promokod muvaffaqiyatli ishlatildi!*\n\n"
+                f"🪙 Hisobingizga *{fmt_robux(amount)} Robux* qo'shildi!",
+                reply_markup=main_kb(lang)
+            )
+        else:
+            amt_str = await format_money(amount, lang)
+            await msg.answer(
+                f"🎉 *Promokod muvaffaqiyatli ishlatildi!*\n\n"
+                f"💰 Hisobingizga *{amt_str}* qo'shildi!",
+                reply_markup=main_kb(lang)
+            )
+    elif status == "already_used":
+        await msg.answer("⚠️ Siz bu promokodni allaqachon ishlatgansiz.", reply_markup=main_kb(lang))
+    elif status == "limit_reached":
+        await msg.answer("⚠️ Bu promokodning ishlatilish limiti tugagan.", reply_markup=main_kb(lang))
+    else:
+        await msg.answer("❌ Bunday promokod topilmadi yoki faol emas. Qaytadan tekshirib ko'ring.", reply_markup=main_kb(lang))
 
 # ═══════════════════════════════════════════════════════
 # HISOB TO'LDIRISH
@@ -1806,11 +1987,12 @@ async def cb_dok(cb: types.CallbackQuery):
     if not dep or dep["status"] != "pending":
         await cb.answer("Allaqachon ko'rilgan!", show_alert=True)
         return
-    await approve_deposit(did)
+    robux_credited = await approve_deposit(did)
     user_lang = await get_user_lang(dep["user_id"])
     amt_str = await format_money(dep['amount'], user_lang)
+    bonus_line = f"\n🪙 Bonus: *{fmt_robux(robux_credited)} Robux*" if robux_credited > 0 else ""
     try:
-        await bot.send_message(dep["user_id"], f"✅ To'lovingiz tasdiqlandi!\n💰 *{amt_str}* hisobingizga qo'shildi!", reply_markup=main_kb(user_lang))
+        await bot.send_message(dep["user_id"], f"✅ To'lovingiz tasdiqlandi!\n💰 *{amt_str}* hisobingizga qo'shildi!{bonus_line}", reply_markup=main_kb(user_lang))
     except Exception:
         pass
     try:
@@ -3584,7 +3766,9 @@ async def admin_panel_kb():
     b.button(text="🎭 Stikerlar boshqaruvi",       callback_data="adm_sticker_menu")
     b.button(text="📦 Stock kanal havolasi",       callback_data="adm_stock_url")
     b.button(text="💎 Pro ilova yuklash",          callback_data="adm_pro_upload")
-    b.adjust(2, 2, 2, 2, 2, 1, 1, 1)
+    b.button(text="🎟 Promokodlar",                callback_data="adm_promo_menu")
+    b.button(text="🪙 Robux kursi",                callback_data="adm_robux_rate")
+    b.adjust(2, 2, 2, 2, 2, 1, 1, 1, 2)
     return b.as_markup(), cnt, or_, tr, sl
 
 @dp.message(Command("admin"))
@@ -3775,6 +3959,211 @@ async def rate_set_rub(msg: types.Message, state: FSMContext):
         f"✅ Kurslar yangilandi!\n\n🇺🇸 1 USD = {usd_val:,.0f} so'm\n🇷🇺 1 RUB = {val:,.0f} so'm",
         reply_markup=main_kb(lang)
     )
+
+# ═══════════════════════════════════════════════════════
+# ADMIN — ROBUX AYIRBOSHLASH KURSI
+# ═══════════════════════════════════════════════════════
+@dp.callback_query(F.data == "adm_robux_rate")
+async def adm_robux_rate(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    rate = await get_robux_rate()
+    rate_per_1000 = rate * 1000
+    await cb.message.answer(
+        f"🪙 *Robux ayirboshlash kursi*\n\n"
+        f"Hozirgi kurs: har *1000 so'm* uchun *{fmt_robux(rate_per_1000)} Robux*.\n\n"
+        f"Bu kurs quyidagilarga qo'llaniladi:\n"
+        f"• Hisob to'ldirish tasdiqlanganda avtomatik Robux bonus\n"
+        f"• Saytdagi balansni Robux'ga almashtirish tugmasi\n\n"
+        f"Yangi kursni kiriting (1000 so'mga necha Robux to'g'ri kelishini, masalan: `0.01`):",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(RobuxRateEdit.rate)
+    await cb.answer()
+
+@dp.message(RobuxRateEdit.rate)
+async def robux_rate_set(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = msg.text.strip().replace(",", ".")
+    try:
+        val = float(txt)
+        if val < 0:
+            raise ValueError
+    except ValueError:
+        await msg.answer("❌ Musbat raqam kiriting (masalan: 0.01):")
+        return
+    await set_robux_rate(val)
+    await state.clear()
+    await msg.answer(f"✅ Yangi kurs saqlandi!\n\n🪙 Har *1000 so'm* uchun *{fmt_robux(val)} Robux*.", reply_markup=main_kb(lang))
+
+# ═══════════════════════════════════════════════════════
+# ADMIN — PROMOKODLAR BOSHQARUVI
+# ═══════════════════════════════════════════════════════
+def _promo_menu_kb():
+    b = InlineKeyboardBuilder()
+    b.button(text="➕ Yangi promokod",      callback_data="adm_promo_add")
+    b.button(text="📋 Promokodlar ro'yxati", callback_data="adm_promo_list")
+    b.button(text="🗑 Promokodni o'chirish", callback_data="adm_promo_del")
+    b.button(text="🔙 Admin panel",         callback_data="adm_back")
+    b.adjust(1, 1, 1, 1)
+    return b.as_markup()
+
+@dp.callback_query(F.data == "adm_promo_menu")
+async def adm_promo_menu(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    total = await promocodes_col.count_documents({})
+    await cb.message.answer(f"🎟 *Promokodlar boshqaruvi*\n\nJami promokodlar: *{total}* ta", reply_markup=_promo_menu_kb())
+    await cb.answer()
+
+@dp.callback_query(F.data == "adm_promo_add")
+async def adm_promo_add(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    await cb.message.answer(
+        "🎟 *Yangi promokod*\n\nPromokod nomini kiriting (masalan: `VEKO2026`):",
+        reply_markup=cancel_kb()
+    )
+    await state.set_state(PromoCreate.code)
+    await cb.answer()
+
+@dp.message(PromoCreate.code)
+async def promo_create_code(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    code = (msg.text or "").strip().upper()
+    if not code or " " in code:
+        await msg.answer("❌ Promokod bo'sh yoki probelsiz bo'lishi kerak. Qaytadan kiriting:")
+        return
+    existing = await get_promo(code)
+    if existing:
+        await msg.answer("❌ Bu nomdagi promokod allaqachon mavjud. Boshqa nom kiriting:")
+        return
+    await state.update_data(promo_code=code)
+    b = InlineKeyboardBuilder()
+    b.button(text="💵 So'm (balans)", callback_data="promo_cur_uzs")
+    b.button(text="🪙 Robux",         callback_data="promo_cur_robux")
+    b.adjust(2)
+    await msg.answer(f"✅ Kod: `{code}`\n\n💱 Promokod qaysi valyutada bo'lsin?", reply_markup=b.as_markup())
+    await state.set_state(PromoCreate.currency)
+
+@dp.callback_query(PromoCreate.currency, F.data.startswith("promo_cur_"))
+async def promo_create_currency(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    currency = cb.data.split("promo_cur_")[1]  # "uzs" | "robux"
+    await state.update_data(promo_currency=currency)
+    label = "so'm" if currency == "uzs" else "Robux"
+    await cb.message.answer(f"💰 Har bir foydalanuvchiga necha *{label}* berilsin? Miqdorni kiriting:", reply_markup=cancel_kb())
+    await state.set_state(PromoCreate.amount)
+    await cb.answer()
+
+@dp.message(PromoCreate.amount)
+async def promo_create_amount(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = msg.text.strip().replace(" ", "").replace(",", ".")
+    try:
+        amount = float(txt)
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        await msg.answer("❌ Musbat raqam kiriting:")
+        return
+    d = await state.get_data()
+    if d.get("promo_currency") == "uzs":
+        amount = int(amount)
+    await state.update_data(promo_amount=amount)
+    await msg.answer("👥 Promokodni nechta odam ishlata olsin? (masalan: `100`):", reply_markup=cancel_kb())
+    await state.set_state(PromoCreate.max_uses)
+
+@dp.message(PromoCreate.max_uses)
+async def promo_create_max_uses(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    txt = msg.text.strip()
+    if not txt.isdigit() or int(txt) <= 0:
+        await msg.answer("❌ Musbat butun son kiriting (masalan: 100):")
+        return
+    max_uses = int(txt)
+    d = await state.get_data()
+    code     = d["promo_code"]
+    currency = d["promo_currency"]
+    amount   = d["promo_amount"]
+    await create_promo(code, currency, amount, max_uses, uid)
+    await state.clear()
+    label = "so'm" if currency == "uzs" else "Robux"
+    amt_str = f"{amount:,}" if currency == "uzs" else fmt_robux(amount)
+    await msg.answer(
+        f"✅ *Promokod yaratildi!*\n\n"
+        f"🎟 Kod: `{code}`\n"
+        f"💰 Miqdor: *{amt_str} {label}*\n"
+        f"👥 Limit: *{max_uses}* ta foydalanuvchi\n\n"
+        f"Foydalanuvchilar 🎟 *Promokod* tugmasi orqali kodni kiritishi mumkin.",
+        reply_markup=main_kb(lang)
+    )
+
+@dp.callback_query(F.data == "adm_promo_list")
+async def adm_promo_list(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    promos = await list_promos()
+    if not promos:
+        await cb.message.answer("📭 Hozircha promokodlar yo'q.")
+        await cb.answer()
+        return
+    lines = ["📋 *Promokodlar ro'yxati:*\n"]
+    for p in promos[:50]:
+        label = "so'm" if p.get("currency") == "uzs" else "Robux"
+        amt_str = f"{p.get('amount', 0):,}" if p.get("currency") == "uzs" else fmt_robux(p.get("amount", 0))
+        status = "✅ Faol" if p.get("active", True) else "⛔ O'chirilgan"
+        lines.append(
+            f"🎟 `{p['code']}` — {amt_str} {label}\n"
+            f"👥 {p.get('used_count', 0)}/{p.get('max_uses', 0)} ishlatilgan • {status}"
+        )
+    await cb.message.answer("\n\n".join(lines))
+    await cb.answer()
+
+@dp.callback_query(F.data == "adm_promo_del")
+async def adm_promo_del(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    await cb.message.answer("🗑 O'chirmoqchi bo'lgan promokod nomini kiriting:", reply_markup=cancel_kb())
+    await state.set_state(PromoDelete.code)
+    await cb.answer()
+
+@dp.message(PromoDelete.code)
+async def promo_delete_handler(msg: types.Message, state: FSMContext):
+    uid  = msg.from_user.id
+    lang = await get_user_lang(uid)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    code = (msg.text or "").strip().upper()
+    ok = await delete_promo(code)
+    await state.clear()
+    if ok:
+        await msg.answer(f"✅ `{code}` promokodi o'chirildi.", reply_markup=main_kb(lang))
+    else:
+        await msg.answer(f"❌ `{code}` nomli promokod topilmadi.", reply_markup=main_kb(lang))
 
 @dp.callback_query(F.data == "adm_sticker_menu")
 async def adm_sticker_menu(cb: types.CallbackQuery):
@@ -6041,11 +6430,14 @@ async def api_me(request):
     await upsert_user_profile(tg_user)
     u = await get_user(uid)
     ref_count = await get_ref_count(uid)
+    robux_rate = await get_robux_rate()
     return _cors(web.json_response({
         "balance": u.get("balance", 0),
         "total_deposited": u.get("total_deposited", 0),
         "joined": u.get("joined", ""),
         "ref_count": ref_count,
+        "robux_balance": u.get("robux_balance", 0),
+        "robux_rate_per_1000": robux_rate * 1000,
     }))
 
 # ═══════════════════════════════════════════════════════
@@ -6400,6 +6792,37 @@ async def api_crash_cashout(request):
     new_bal = await get_balance(uid)
     return _cors(web.json_response({"balance": new_bal}))
 
+async def api_exchange(request):
+    """POST /webapp/api/exchange {initData, amount} — balansdan (so'm) Robux'ga ayirboshlaydi."""
+    try:
+        body = await request.json()
+    except Exception:
+        return _cors(web.json_response({"error": "bad_request"}, status=400))
+    tg_user = verify_webapp_initdata(body.get("initData", ""))
+    if not tg_user:
+        return _cors(web.json_response({"error": "unauthorized"}, status=401))
+    uid = tg_user["id"]
+    try:
+        amount = int(body.get("amount", 0))
+    except Exception:
+        return _cors(web.json_response({"error": "bad_amount"}, status=400))
+    if amount < 1000:
+        return _cors(web.json_response({"error": "invalid_amount"}, status=400))
+    bal = await get_balance(uid)
+    if bal < amount:
+        return _cors(web.json_response({"error": "insufficient_balance", "balance": bal}, status=400))
+    rate = await get_robux_rate()
+    robux_gained = round(amount * rate, 4)
+    await sub_balance(uid, amount)
+    await add_robux(uid, robux_gained)
+    new_bal = await get_balance(uid)
+    new_robux = await get_robux_balance(uid)
+    return _cors(web.json_response({
+        "balance": new_bal,
+        "robux_balance": new_robux,
+        "robux_gained": robux_gained,
+    }))
+
 async def api_sales(request):
     """GET /webapp/api/sales — barcha faol e'lonlarni o'yin bo'yicha guruhlab qaytaradi."""
     items = await active_sales()
@@ -6514,6 +6937,7 @@ async def _run_health_server():
     app.router.add_get("/webapp/api/me", api_me)
     app.router.add_post("/webapp/api/bet", api_crash_bet)
     app.router.add_post("/webapp/api/cashout", api_crash_cashout)
+    app.router.add_post("/webapp/api/exchange", api_exchange)
     app.router.add_get("/webapp/api/sales", api_sales)
     app.router.add_post("/webapp/api/sale/add", api_sale_add)
     app.router.add_get("/webapp/api/photo/{file_id}", api_photo)
