@@ -36,6 +36,16 @@ from telethon.errors import (
 )
 from telethon.tl.types import Channel, Chat, InputPeerChannel
 
+# ── 🎙 Matn/Audio (TTS) va 🔲 QR Kod bo'limlari uchun kutubxonalar ──
+import edge_tts
+import qrcode
+from qrcode.constants import ERROR_CORRECT_H
+from qrcode.image.styledpil import StyledPilImage
+from qrcode.image.styles.moduledrawers import RoundedModuleDrawer
+from qrcode.image.styles.colormasks import SolidFillColorMask, HorizontalGradiantColorMask
+from PIL import Image
+from aiogram.types import BufferedInputFile
+
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
@@ -428,6 +438,9 @@ userbot_accounts   = mdb["userbot_accounts"]    # ulangan shaxsiy akkauntlar (se
 autoreply_col      = mdb["autoreply_settings"]  # avto javob sozlamalari
 autobroadcast_col  = mdb["autobroadcast"]       # avto xabar (kanallarga davriy yuborish) sozlamalari
 
+# ── 🎙 Matn/Audio (TTS) uchun kolleksiya ──
+tts_settings_col   = mdb["tts_settings"]        # foydalanuvchi tanlagan ovoz (erkak/qiz)
+
 # ── Web App Chat tizimi uchun kolleksiyalar ──
 chat_global_col    = mdb["chat_global"]         # global chat xabarlari (hammaga ko'rinadi)
 chat_private_col   = mdb["chat_private"]        # shaxsiy chat xabarlari (ikki foydalanuvchi orasida)
@@ -448,6 +461,7 @@ async def init_indexes():
     await userbot_accounts.create_index("user_id", unique=True)
     await autoreply_col.create_index("user_id", unique=True)
     await autobroadcast_col.create_index("user_id")
+    await tts_settings_col.create_index("user_id", unique=True)
     await users.create_index("username_lower")
     await chat_global_col.create_index("ts")
     await chat_private_col.create_index([("from_id", 1), ("to_id", 1), ("ts", 1)])
@@ -1368,11 +1382,13 @@ def main_kb(lang="uz"):
     b.button(text=T(lang, "btn_proofs"))
     b.button(text=T(lang, "btn_bloxfruit"))
     b.button(text="🤖 AI Yordamchi")
+    b.button(text="🎙 Matn/Audio")
+    b.button(text="🔲 QR Kod")
     b.button(text=T(lang, "btn_pro_menu"))
     b.button(text=T(lang, "btn_change_lang"))
     b.button(text=T(lang, "btn_game"))
     b.button(text=T(lang, "btn_promo"))
-    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1)
+    b.adjust(2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 1)
     return b.as_markup(resize_keyboard=True)
 
 def _as_user_msg(cb: types.CallbackQuery) -> types.Message:
@@ -5306,7 +5322,27 @@ class AutoBroadcastSetup(StatesGroup):
 PENDING_LOGIN: dict[int, dict] = {}
 # Avto javobda spam/loop bo'lmasligi uchun tashqi cooldown: {(owner_uid, sender_id): last_ts}
 REPLY_THROTTLE: dict[tuple, float] = {}
-REPLY_THROTTLE_SECONDS = 6 * 3600  # bir xil odamga 6 soatda bir marta avto javob
+REPLY_THROTTLE_SECONDS_DEFAULT = 5 * 60  # sozlanmagan bo'lsa: 5 daqiqada bir marta avto javob
+
+# ⏱ Foydalanuvchi tanlashi mumkin bo'lgan tayyor kutish vaqtlari (soniyalarda)
+AR_DELAY_PRESETS = [
+    ("1 daqiqa",  60),
+    ("2 daqiqa",  120),
+    ("5 daqiqa",  300),
+    ("10 daqiqa", 600),
+    ("30 daqiqa", 1800),
+    ("1 soat",    3600),
+]
+
+class AutoReplyDelay(StatesGroup):
+    custom = State()
+
+def _fmt_delay(seconds: int) -> str:
+    if seconds % 3600 == 0:
+        return f"{seconds // 3600} soat"
+    if seconds % 60 == 0:
+        return f"{seconds // 60} daqiqa"
+    return f"{seconds} soniya"
 
 
 async def download_bytes(file_id: str) -> bytes:
@@ -5363,7 +5399,8 @@ class UserbotManager:
                     return
                 key = (uid, event.sender_id)
                 last = REPLY_THROTTLE.get(key, 0)
-                if datetime.now().timestamp() - last < REPLY_THROTTLE_SECONDS:
+                delay_seconds = settings.get("delay_seconds", REPLY_THROTTLE_SECONDS_DEFAULT)
+                if datetime.now().timestamp() - last < delay_seconds:
                     return
                 REPLY_THROTTLE[key] = datetime.now().timestamp()
                 client = self.clients.get(uid)
@@ -5663,18 +5700,82 @@ async def ar_menu(cb: types.CallbackQuery):
         return
     settings = await autoreply_col.find_one({"user_id": uid})
     b = InlineKeyboardBuilder()
+    delay_txt = _fmt_delay((settings or {}).get("delay_seconds", REPLY_THROTTLE_SECONDS_DEFAULT))
     if settings:
         state_txt = "✅ Yoqilgan" if settings.get("enabled") else "🚫 O'chirilgan"
         toggle_txt = "🚫 O'chirish" if settings.get("enabled") else "✅ Yoqish"
         b.button(text="✏️ Qayta sozlash", callback_data="ar_setup_start")
         b.button(text=toggle_txt, callback_data="ar_toggle")
+        b.button(text="⏱ Kutish vaqti", callback_data="ar_delay_menu")
     else:
         state_txt = "Sozlanmagan"
         b.button(text="➕ Sozlash", callback_data="ar_setup_start")
     b.button(text="⬅️ Orqaga", callback_data="ai_back")
     b.adjust(1)
-    await cb.message.answer(f"🔁 *Avto javob*\n\nHolati: {state_txt}", reply_markup=b.as_markup())
+    await cb.message.answer(
+        f"🔁 *Avto javob*\n\nHolati: {state_txt}\n⏱ Kutish vaqti: *{delay_txt}*\n\n"
+        "_(Odam yozganda darhol javob beriladi, so'ng shu vaqt o'tmaguncha "
+        "o'sha odamga qayta javob berilmaydi)_",
+        reply_markup=b.as_markup()
+    )
     await cb.answer()
+
+
+@dp.callback_query(F.data == "ar_delay_menu")
+async def ar_delay_menu(cb: types.CallbackQuery):
+    uid = cb.from_user.id
+    settings = await autoreply_col.find_one({"user_id": uid}) or {}
+    current = settings.get("delay_seconds", REPLY_THROTTLE_SECONDS_DEFAULT)
+    b = InlineKeyboardBuilder()
+    for label, seconds in AR_DELAY_PRESETS:
+        mark = "✅ " if seconds == current else ""
+        b.button(text=f"{mark}{label}", callback_data=f"ar_delay_set_{seconds}")
+    b.button(text="✏️ Boshqa (o'zim kiritaman)", callback_data="ar_delay_custom")
+    b.button(text="⬅️ Orqaga", callback_data="ar_menu")
+    b.adjust(2, 2, 2, 1, 1)
+    await cb.message.answer(
+        f"⏱ *Kutish vaqtini tanlang*\n\nHozirgi: *{_fmt_delay(current)}*",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("ar_delay_set_"))
+async def ar_delay_set(cb: types.CallbackQuery):
+    uid = cb.from_user.id
+    seconds = int(cb.data[len("ar_delay_set_"):])
+    await autoreply_col.update_one({"user_id": uid}, {"$set": {"delay_seconds": seconds}}, upsert=True)
+    await cb.answer(f"✅ {_fmt_delay(seconds)} qilib belgilandi!")
+    await ar_menu(cb)
+
+
+@dp.callback_query(F.data == "ar_delay_custom")
+async def ar_delay_custom(cb: types.CallbackQuery, state: FSMContext):
+    lang = await get_user_lang(cb.from_user.id)
+    await cb.message.answer(
+        "✏️ Necha *daqiqa* kutish kerakligini raqam bilan yozing (masalan: 15):",
+        reply_markup=cancel_kb(lang)
+    )
+    await state.set_state(AutoReplyDelay.custom)
+    await cb.answer()
+
+
+@dp.message(AutoReplyDelay.custom)
+async def ar_delay_custom_got(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    raw = (msg.text or "").strip()
+    if not raw.isdigit() or int(raw) <= 0:
+        await msg.answer("❌ Faqat musbat butun son kiriting (daqiqa), masalan: 15")
+        return
+    seconds = int(raw) * 60
+    await autoreply_col.update_one({"user_id": msg.from_user.id}, {"$set": {"delay_seconds": seconds}}, upsert=True)
+    await state.clear()
+    await msg.answer(f"✅ Kutish vaqti *{_fmt_delay(seconds)}* qilib belgilandi!", reply_markup=main_kb(lang))
+    await show_ai_menu(msg.chat.id, msg.from_user.id)
 
 
 @dp.callback_query(F.data == "ar_toggle")
@@ -6063,6 +6164,297 @@ async def broadcast_scheduler_loop():
         except Exception as e:
             logging.error(f"Broadcast scheduler xatosi: {e}")
         await asyncio.sleep(30)
+
+
+# ═══════════════════════════════════════════════════════
+# 🎙 MATN/AUDIO (TEXT-TO-SPEECH) — edge-tts asosida,
+# faqat o'zbek tilida, erkak/qiz ovoz tanlash imkoniyati bilan
+# ═══════════════════════════════════════════════════════
+
+TTS_VOICES = {
+    "erkak": "uz-UZ-SardorNeural",
+    "qiz":   "uz-UZ-MadinaNeural",
+}
+TTS_MAX_CHARS = 800
+
+class TTSFlow(StatesGroup):
+    text = State()
+
+
+async def _get_tts_voice(uid: int) -> str:
+    s = await tts_settings_col.find_one({"user_id": uid})
+    return (s or {}).get("voice", "qiz")
+
+
+async def show_tts_menu(chat_id: int, uid: int):
+    voice = await _get_tts_voice(uid)
+    voice_label = "👦 Erkak" if voice == "erkak" else "👧 Qiz"
+    b = InlineKeyboardBuilder()
+    b.button(text=("✅ 👦 Erkak" if voice == "erkak" else "👦 Erkak"), callback_data="tts_voice_erkak")
+    b.button(text=("✅ 👧 Qiz" if voice == "qiz" else "👧 Qiz"), callback_data="tts_voice_qiz")
+    b.button(text="🔊 Audio qilish", callback_data="tts_make")
+    b.adjust(2, 1)
+    await bot.send_message(
+        chat_id,
+        f"🎙 *Matn/Audio*\n\nTanlangan ovoz: *{voice_label}*\n\n"
+        "Pastdan ovozni tanlang, so'ng \"🔊 Audio qilish\" tugmasini bosib matn yuboring — "
+        "shu matn tanlangan ovozda o'zbek tilida audio qilib beriladi.",
+        reply_markup=b.as_markup()
+    )
+
+
+@dp.message(F.text == "🎙 Matn/Audio")
+async def cmd_tts_menu(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    await show_tts_menu(msg.chat.id, msg.from_user.id)
+
+
+@dp.callback_query(F.data.in_(["tts_voice_erkak", "tts_voice_qiz"]))
+async def tts_voice_set(cb: types.CallbackQuery):
+    voice = "erkak" if cb.data == "tts_voice_erkak" else "qiz"
+    await tts_settings_col.update_one(
+        {"user_id": cb.from_user.id}, {"$set": {"voice": voice}}, upsert=True
+    )
+    await cb.answer("✅ Ovoz tanlandi!")
+    await show_tts_menu(cb.message.chat.id, cb.from_user.id)
+
+
+@dp.callback_query(F.data == "tts_make")
+async def tts_make(cb: types.CallbackQuery, state: FSMContext):
+    lang = await get_user_lang(cb.from_user.id)
+    await cb.message.answer(
+        "📝 Audio qilinadigan matnni yuboring (faqat o'zbek tilida yozing):",
+        reply_markup=cancel_kb(lang)
+    )
+    await state.set_state(TTSFlow.text)
+    await cb.answer()
+
+
+@dp.message(TTSFlow.text)
+async def tts_text_got(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    text = (msg.text or "").strip()
+    if not text:
+        await msg.answer("❌ Matn bo'sh bo'lmasin, qaytadan yozing:")
+        return
+    if len(text) > TTS_MAX_CHARS:
+        await msg.answer(f"❌ Matn juda uzun (max {TTS_MAX_CHARS} belgi). Qisqartirib qaytadan yuboring:")
+        return
+
+    voice_key = await _get_tts_voice(msg.from_user.id)
+    voice = TTS_VOICES.get(voice_key, TTS_VOICES["qiz"])
+    wait_msg = await msg.answer("⏳ Audio tayyorlanmoqda...")
+    try:
+        mp3_buf = BytesIO()
+        communicate = edge_tts.Communicate(text, voice)
+        async for chunk in communicate.stream():
+            if chunk["type"] == "audio":
+                mp3_buf.write(chunk["data"])
+        mp3_buf.seek(0)
+        audio_file = BufferedInputFile(mp3_buf.read(), filename="audio.mp3")
+        await msg.answer_audio(audio_file, title="🎙 Matn -> Audio")
+    except Exception as e:
+        logging.error(f"TTS xatosi: {e}")
+        await msg.answer("❌ Audio yaratishda xatolik yuz berdi. Birozdan so'ng qaytadan urinib ko'ring.")
+    finally:
+        try:
+            await wait_msg.delete()
+        except Exception:
+            pass
+    await state.clear()
+
+
+# ═══════════════════════════════════════════════════════
+# 🔲 QR KOD GENERATOR — matn/link asosida, ixtiyoriy
+# stiker/rasm va rang bilan bezatilgan QR kod yaratadi
+# ═══════════════════════════════════════════════════════
+
+QR_COLORS = [
+    ("⚫ Qora",       "solid",    (0, 0, 0), None),
+    ("🔴 Qizil",      "solid",    (211, 47, 47), None),
+    ("🔵 Ko'k",       "solid",    (25, 118, 210), None),
+    ("🟢 Yashil",     "solid",    (56, 142, 60), None),
+    ("🟡 Sariq",      "solid",    (245, 178, 12), None),
+    ("🟣 Binafsha",   "solid",    (123, 31, 162), None),
+    ("🌈 Rangma-rang", "gradient", (255, 179, 0), (142, 36, 170)),
+]
+
+class QRFlow(StatesGroup):
+    content = State()
+    media   = State()
+
+
+def _qr_color_kb():
+    b = InlineKeyboardBuilder()
+    for i, (label, *_rest) in enumerate(QR_COLORS):
+        b.button(text=label, callback_data=f"qr_color_{i}")
+    b.adjust(2)
+    return b.as_markup()
+
+
+def _qr_style_kb():
+    b = InlineKeyboardBuilder()
+    b.button(text="😄 Kulgili", callback_data="qr_style_plain")
+    b.button(text="🎉 Qiziqarli", callback_data="qr_style_plain")
+    b.button(text="🖼 Rasmli", callback_data="qr_style_image")
+    b.button(text="😊 Stikerli", callback_data="qr_style_sticker")
+    b.adjust(2)
+    return b.as_markup()
+
+
+@dp.message(F.text == "🔲 QR Kod")
+async def cmd_qr_start(msg: types.Message, state: FSMContext):
+    if not await check_access(msg, state):
+        return
+    lang = await get_user_lang(msg.from_user.id)
+    await state.update_data(qr_media=None, qr_media_kind=None)
+    await msg.answer(
+        "🔲 *QR Kod yaratish*\n\n📝 QR kod ichiga solinadigan matn yoki linkni yuboring:",
+        reply_markup=cancel_kb(lang)
+    )
+    await state.set_state(QRFlow.content)
+
+
+@dp.message(QRFlow.content)
+async def qr_content_got(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    content = (msg.text or "").strip()
+    if not content:
+        await msg.answer("❌ Matn bo'sh bo'lmasin, qaytadan yozing:")
+        return
+    await state.update_data(qr_content=content)
+    await msg.answer(
+        "🎨 QR kod qanaqa bo'lsin?",
+        reply_markup=_qr_style_kb()
+    )
+
+
+@dp.callback_query(F.data == "qr_style_plain")
+async def qr_style_plain(cb: types.CallbackQuery, state: FSMContext):
+    await state.update_data(qr_media=None, qr_media_kind=None)
+    await cb.message.answer("🎨 Endi rangini tanlang:", reply_markup=_qr_color_kb())
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "qr_style_image")
+async def qr_style_image(cb: types.CallbackQuery, state: FSMContext):
+    lang = await get_user_lang(cb.from_user.id)
+    await state.update_data(qr_media_kind="image")
+    await cb.message.answer("🖼 QR kod markaziga qo'yiladigan rasmni yuboring:", reply_markup=skip_cancel_kb(lang))
+    await state.set_state(QRFlow.media)
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "qr_style_sticker")
+async def qr_style_sticker(cb: types.CallbackQuery, state: FSMContext):
+    lang = await get_user_lang(cb.from_user.id)
+    await state.update_data(qr_media_kind="sticker")
+    await cb.message.answer(
+        "😊 QR kod markaziga qo'yiladigan *statik* stikerni yuboring "
+        "(animatsion stiker ishlamaydi):",
+        reply_markup=skip_cancel_kb(lang)
+    )
+    await state.set_state(QRFlow.media)
+    await cb.answer()
+
+
+@dp.message(QRFlow.media, F.photo)
+async def qr_media_photo_got(msg: types.Message, state: FSMContext):
+    raw = await download_bytes(msg.photo[-1].file_id)
+    await state.update_data(qr_media=base64.b64encode(raw).decode())
+    lang = await get_user_lang(msg.from_user.id)
+    await msg.answer("🎨 Endi rangini tanlang:", reply_markup=_qr_color_kb())
+
+
+@dp.message(QRFlow.media, F.sticker)
+async def qr_media_sticker_got(msg: types.Message, state: FSMContext):
+    if msg.sticker.is_animated or msg.sticker.is_video:
+        await msg.answer("❌ Bu stiker animatsion, statik stiker yuboring yoki \"Skip\" bosing:")
+        return
+    raw = await download_bytes(msg.sticker.file_id)
+    await state.update_data(qr_media=base64.b64encode(raw).decode())
+    await msg.answer("🎨 Endi rangini tanlang:", reply_markup=_qr_color_kb())
+
+
+@dp.message(QRFlow.media)
+async def qr_media_skip(msg: types.Message, state: FSMContext):
+    lang = await get_user_lang(msg.from_user.id)
+    if msg.text == T(lang, "cancel"):
+        await state.clear()
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+        return
+    if msg.text == T(lang, "skip"):
+        await state.update_data(qr_media=None)
+        await msg.answer("🎨 Endi rangini tanlang:", reply_markup=_qr_color_kb())
+        return
+    await msg.answer("❌ Rasm/stiker yuboring yoki \"Skip\" bosing:")
+
+
+@dp.callback_query(F.data.startswith("qr_color_"))
+async def qr_color_chosen(cb: types.CallbackQuery, state: FSMContext):
+    lang = await get_user_lang(cb.from_user.id)
+    idx = int(cb.data[len("qr_color_"):])
+    _label, kind, c1, c2 = QR_COLORS[idx]
+    d = await state.get_data()
+    content = d.get("qr_content")
+    if not content:
+        await cb.answer("❌ Xatolik, qaytadan boshlang.", show_alert=True)
+        await state.clear()
+        return
+
+    await cb.answer("⏳ Yaratilmoqda...")
+    wait_msg = await cb.message.answer("⏳ QR kod tayyorlanmoqda...")
+    try:
+        qr = qrcode.QRCode(error_correction=ERROR_CORRECT_H, box_size=12, border=3)
+        qr.add_data(content)
+        qr.make(fit=True)
+
+        color_mask = SolidFillColorMask(front_color=c1) if kind == "solid" \
+            else HorizontalGradiantColorMask(left_color=c1, right_color=c2)
+
+        embed_img = None
+        media_b64 = d.get("qr_media")
+        if media_b64:
+            raw = base64.b64decode(media_b64)
+            embed_img = Image.open(BytesIO(raw)).convert("RGBA")
+
+        if embed_img:
+            img = qr.make_image(
+                image_factory=StyledPilImage,
+                module_drawer=RoundedModuleDrawer(),
+                color_mask=color_mask,
+                embeded_image=embed_img,
+            )
+        else:
+            img = qr.make_image(
+                image_factory=StyledPilImage,
+                module_drawer=RoundedModuleDrawer(),
+                color_mask=color_mask,
+            )
+
+        out = BytesIO()
+        img.save(out, format="PNG")
+        out.seek(0)
+        photo = BufferedInputFile(out.read(), filename="qrcode.png")
+        await cb.message.answer_photo(photo, caption="✅ QR kodingiz tayyor!")
+    except Exception as e:
+        logging.error(f"QR kod xatosi: {e}")
+        await cb.message.answer("❌ QR kod yaratishda xatolik yuz berdi. Qaytadan urinib ko'ring.")
+    finally:
+        try:
+            await wait_msg.delete()
+        except Exception:
+            pass
+    await state.clear()
 
 
 # ═══════════════════════════════════════════════════════
