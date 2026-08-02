@@ -5521,6 +5521,10 @@ async def ub_connect_start(cb: types.CallbackQuery, state: FSMContext):
     if not TELETHON_API_ID or not TELETHON_API_HASH:
         await cb.answer("⚠️ TELETHON_API_ID / TELETHON_API_HASH sozlanmagan (.env)!", show_alert=True)
         return
+    # Oldingi tugallanmagan urinishdan qolgan client bo'lsa (masalan foydalanuvchi
+    # jarayonni bekor qilmasdan qayta boshlagan bo'lsa), uni albatta uzib tashlaymiz.
+    # Aks holda eski ochiq ulanish serverda yangi kodni "eskirgan" deb hisoblanishiga sabab bo'ladi.
+    await _cleanup_pending_login(cb.from_user.id)
     lang = await get_user_lang(cb.from_user.id)
     await cb.message.answer(
         "📱 Telegram akkauntingiz raqamini xalqaro formatda yuboring.\n"
@@ -5542,6 +5546,11 @@ async def ub_got_phone(msg: types.Message, state: FSMContext):
     if not phone.startswith("+") or not phone[1:].isdigit() or len(phone) < 8:
         await msg.answer("❌ Raqam noto'g'ri formatda. Masalan: +998901234567\nQaytadan yuboring:")
         return
+    # Ehtiyot chorasi: shu foydalanuvchi uchun avvalgi tugallanmagan urinishdan
+    # qolgan client bo'lsa, yangisini yaratishdan oldin uni uzib tashlaymiz.
+    # Bir nechta ochiq (uzilmagan) client bir xil raqam uchun serverda kod
+    # so'rovlarini bir-biriga qarshi qilib, "kod eskirgan" xatosiga olib kelishi mumkin.
+    await _cleanup_pending_login(uid)
     wait_msg = await msg.answer("⏳ Kod yuborilmoqda...")
     client = TelegramClient(StringSession(), TELETHON_API_ID, TELETHON_API_HASH)
     try:
@@ -5549,15 +5558,27 @@ async def ub_got_phone(msg: types.Message, state: FSMContext):
         sent = await client.send_code_request(phone)
     except FloodWaitError as e:
         await wait_msg.edit_text(f"❌ Juda ko'p urinish qilindi. {e.seconds} soniyadan keyin qaytadan urining.")
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
         await state.clear()
         return
     except PhoneNumberInvalidError:
         await wait_msg.edit_text("❌ Bu raqam noto'g'ri. Qaytadan urinib ko'ring.")
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
         await state.clear()
         return
     except Exception as e:
         logging.error(f"send_code_request xatosi: {e}")
         await wait_msg.edit_text("❌ Xatolik yuz berdi, birozdan keyin qaytadan urinib ko'ring.")
+        try:
+            await client.disconnect()
+        except Exception:
+            pass
         await state.clear()
         return
     PENDING_LOGIN[uid] = {"client": client, "phone": phone, "phone_code_hash": sent.phone_code_hash}
