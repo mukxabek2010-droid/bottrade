@@ -1,6 +1,7 @@
 import os
 import asyncio
 import logging
+import random
 import base64
 import hashlib
 import hmac
@@ -441,6 +442,10 @@ autobroadcast_col  = mdb["autobroadcast"]       # avto xabar (kanallarga davriy 
 # ── 🎙 Matn/Audio (TTS) uchun kolleksiya ──
 tts_settings_col   = mdb["tts_settings"]        # foydalanuvchi tanlagan ovoz (erkak/qiz)
 
+# ── Guruh/Kanal ro'yxati (bot admin qilingan chatlar) va Konkurs (giveaway) ──
+bot_chats_col      = mdb["bot_chats"]           # bot a'zo/admin bo'lgan guruh va kanallar
+giveaways_col      = mdb["giveaways"]           # konkurslar (giveaway)
+
 # ── Web App Chat tizimi uchun kolleksiyalar ──
 chat_global_col    = mdb["chat_global"]         # global chat xabarlari (hammaga ko'rinadi)
 chat_private_col   = mdb["chat_private"]        # shaxsiy chat xabarlari (ikki foydalanuvchi orasida)
@@ -466,6 +471,8 @@ async def init_indexes():
     await chat_global_col.create_index("ts")
     await chat_private_col.create_index([("from_id", 1), ("to_id", 1), ("ts", 1)])
     await chat_contacts_col.create_index([("owner_id", 1), ("peer_id", 1)], unique=True)
+    await bot_chats_col.create_index("chat_id", unique=True)
+    await giveaways_col.create_index([("status", 1), ("end_at", 1)])
 
 # ═══════════════════════════════════════════════════════
 # HELPERS
@@ -1305,6 +1312,14 @@ class StickerSet(StatesGroup):
 class StockEdit(StatesGroup):
     url = State()
 
+class GiveawayFlow(StatesGroup):
+    channel    = State()
+    text       = State()
+    photo      = State()
+    end_at     = State()
+    winners    = State()
+    subchannels = State()
+
 class MuteFlow(StatesGroup):
     user_id  = State()
     duration = State()
@@ -1334,6 +1349,30 @@ PROOFS_CHANNEL = os.getenv("PROOFS_CHANNEL", "@veko_bulldrop")
 # ═══════════════════════════════════════════════════════
 bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode="Markdown"))
 dp  = Dispatcher(storage=MemoryStorage())
+
+# ═══════════════════════════════════════════════════════
+# GURUH / KANAL ADMIN TEKSHIRUVLARI
+# (bot qaysi guruh/kanallarda admin — /audio, /qr, Konkurs uchun)
+# ═══════════════════════════════════════════════════════
+async def is_bot_admin_in_chat(chat_id: int) -> bool:
+    try:
+        member = await bot.get_chat_member(chat_id, bot.id)
+        return member.status in ("administrator", "creator")
+    except Exception:
+        return False
+
+
+async def is_user_admin_in_chat(chat_id: int, user_id: int) -> bool:
+    try:
+        member = await bot.get_chat_member(chat_id, user_id)
+        return member.status in ("administrator", "creator")
+    except Exception:
+        return False
+
+
+async def admin_channels_list() -> list:
+    """Bot admin qilib qo'yilgan kanallar ro'yxati (Konkurs uchun)."""
+    return [c async for c in bot_chats_col.find({"type": "channel", "is_admin": True}).sort("title", 1)]
 
 # ═══════════════════════════════════════════════════════
 # KEYBOARDS
@@ -1458,6 +1497,23 @@ async def not_subscribed_channels(uid: int) -> list:
 async def is_sub(uid: int) -> bool:
     missing = await not_subscribed_channels(uid)
     return len(missing) == 0
+
+
+async def missing_subs_for(uid: int, channels: list) -> list:
+    """not_subscribed_channels ga o'xshash, lekin ixtiyoriy kanallar ro'yxati bilan (Konkurs uchun)."""
+    missing = []
+    for ch in channels:
+        try:
+            m = await bot.get_chat_member(chat_id=ch, user_id=uid)
+            if m.status in ["left", "kicked", "banned"]:
+                missing.append(ch)
+        except Exception as e:
+            err = str(e).lower()
+            if "user not found" in err or "user_not_participant" in err or "chat not found" in err:
+                missing.append(ch)
+            else:
+                logging.error(f"⚠️ Konkurs sub check texnik xato ({ch}): {e}")
+    return missing
 
 async def check_access(msg: types.Message, state: FSMContext) -> bool:
     uid = msg.from_user.id
@@ -1604,6 +1660,54 @@ async def post_online_trader_to_channel(uname: str, nick: str, bio: str, photo_i
 # ═══════════════════════════════════════════════════════
 # /START + TIL TANLASH
 # ═══════════════════════════════════════════════════════
+@dp.my_chat_member()
+async def on_bot_chat_member_update(event: types.ChatMemberUpdated):
+    """Bot biror guruh/kanalga qo'shilganda yoki admin/olib tashlanganda ishga tushadi."""
+    try:
+        chat = event.chat
+        if chat.type not in ("group", "supergroup", "channel"):
+            return
+        new_status = event.new_chat_member.status
+        was_admin = event.old_chat_member.status == "administrator" if event.old_chat_member else False
+        is_admin_now = new_status == "administrator"
+
+        await bot_chats_col.update_one(
+            {"chat_id": chat.id},
+            {"$set": {
+                "chat_id": chat.id,
+                "title": chat.title,
+                "type": chat.type,
+                "username": chat.username,
+                "is_admin": is_admin_now,
+                "updated_at": now(),
+            }},
+            upsert=True
+        )
+
+        if is_admin_now and not was_admin:
+            try:
+                if chat.type == "channel":
+                    text = (
+                        "✅ *Men ushbu kanalda admin qilib tayinlandim!*\n\n"
+                        "Endi shu yerda 🎉 *Konkurs* (giveaway) o'tkazishingiz mumkin.\n"
+                        "Botga shaxsiy yozib, /admin buyrug'i orqali \"🎉 Konkurs\" bo'limini oching."
+                    )
+                else:
+                    text = (
+                        "✅ *Men ushbu guruhda admin qilib tayinlandim!*\n\n"
+                        "Endi guruh a'zolari quyidagilardan bemalol foydalana olishadi:\n"
+                        "🎙 /audio — matnni ovozli xabarga aylantirish\n"
+                        "🔲 /qr — shu guruh uchun QR kod yaratish"
+                    )
+                await bot.send_message(chat.id, text)
+            except Exception:
+                pass
+        elif new_status in ("left", "kicked"):
+            await bot_chats_col.update_one({"chat_id": chat.id}, {"$set": {"is_admin": False}})
+    except Exception as e:
+        logging.error(f"my_chat_member xatosi: {e}")
+
+
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message, state: FSMContext):
     uid = msg.from_user.id
@@ -3784,7 +3888,8 @@ async def admin_panel_kb():
     b.button(text="💎 Pro ilova yuklash",          callback_data="adm_pro_upload")
     b.button(text="🎟 Promokodlar",                callback_data="adm_promo_menu")
     b.button(text="🪙 Robux kursi",                callback_data="adm_robux_rate")
-    b.adjust(2, 2, 2, 2, 2, 1, 1, 1, 2)
+    b.button(text="🎉 Konkurs",                    callback_data="adm_giveaway_menu")
+    b.adjust(2, 2, 2, 2, 2, 1, 1, 1, 2, 1)
     return b.as_markup(), cnt, or_, tr, sl
 
 @dp.message(Command("admin"))
@@ -5521,10 +5626,6 @@ async def ub_connect_start(cb: types.CallbackQuery, state: FSMContext):
     if not TELETHON_API_ID or not TELETHON_API_HASH:
         await cb.answer("⚠️ TELETHON_API_ID / TELETHON_API_HASH sozlanmagan (.env)!", show_alert=True)
         return
-    # Oldingi tugallanmagan urinishdan qolgan client bo'lsa (masalan foydalanuvchi
-    # jarayonni bekor qilmasdan qayta boshlagan bo'lsa), uni albatta uzib tashlaymiz.
-    # Aks holda eski ochiq ulanish serverda yangi kodni "eskirgan" deb hisoblanishiga sabab bo'ladi.
-    await _cleanup_pending_login(cb.from_user.id)
     lang = await get_user_lang(cb.from_user.id)
     await cb.message.answer(
         "📱 Telegram akkauntingiz raqamini xalqaro formatda yuboring.\n"
@@ -5546,11 +5647,6 @@ async def ub_got_phone(msg: types.Message, state: FSMContext):
     if not phone.startswith("+") or not phone[1:].isdigit() or len(phone) < 8:
         await msg.answer("❌ Raqam noto'g'ri formatda. Masalan: +998901234567\nQaytadan yuboring:")
         return
-    # Ehtiyot chorasi: shu foydalanuvchi uchun avvalgi tugallanmagan urinishdan
-    # qolgan client bo'lsa, yangisini yaratishdan oldin uni uzib tashlaymiz.
-    # Bir nechta ochiq (uzilmagan) client bir xil raqam uchun serverda kod
-    # so'rovlarini bir-biriga qarshi qilib, "kod eskirgan" xatosiga olib kelishi mumkin.
-    await _cleanup_pending_login(uid)
     wait_msg = await msg.answer("⏳ Kod yuborilmoqda...")
     client = TelegramClient(StringSession(), TELETHON_API_ID, TELETHON_API_HASH)
     try:
@@ -5558,27 +5654,15 @@ async def ub_got_phone(msg: types.Message, state: FSMContext):
         sent = await client.send_code_request(phone)
     except FloodWaitError as e:
         await wait_msg.edit_text(f"❌ Juda ko'p urinish qilindi. {e.seconds} soniyadan keyin qaytadan urining.")
-        try:
-            await client.disconnect()
-        except Exception:
-            pass
         await state.clear()
         return
     except PhoneNumberInvalidError:
         await wait_msg.edit_text("❌ Bu raqam noto'g'ri. Qaytadan urinib ko'ring.")
-        try:
-            await client.disconnect()
-        except Exception:
-            pass
         await state.clear()
         return
     except Exception as e:
         logging.error(f"send_code_request xatosi: {e}")
         await wait_msg.edit_text("❌ Xatolik yuz berdi, birozdan keyin qaytadan urinib ko'ring.")
-        try:
-            await client.disconnect()
-        except Exception:
-            pass
         await state.clear()
         return
     PENDING_LOGIN[uid] = {"client": client, "phone": phone, "phone_code_hash": sent.phone_code_hash}
@@ -6248,17 +6332,79 @@ async def tts_make(cb: types.CallbackQuery, state: FSMContext):
         "📝 Audio qilinadigan matnni yuboring (faqat o'zbek tilida yozing):",
         reply_markup=cancel_kb(lang)
     )
+    await state.update_data(tts_group=False)
     await state.set_state(TTSFlow.text)
     await cb.answer()
+
+
+@dp.message(Command("audio"))
+async def cmd_audio_cmd(msg: types.Message, state: FSMContext):
+    """/audio — shaxsiy chatda to'liq menyu, guruh/kanalda esa bot admin bo'lsa to'g'ridan-to'g'ri ishlaydi."""
+    if msg.chat.type == "private":
+        if not await check_access(msg, state):
+            return
+        await show_tts_menu(msg.chat.id, msg.from_user.id)
+        return
+
+    if not await is_bot_admin_in_chat(msg.chat.id):
+        await msg.reply(
+            "❌ Bu buyruq ishlashi uchun avval meni shu guruhda/kanalda *admin* qilib tayinlang."
+        )
+        return
+
+    voice = await _get_tts_voice(msg.from_user.id)
+    voice_label = "👦 Erkak" if voice == "erkak" else "👧 Qiz"
+    await state.update_data(tts_group=True)
+    await state.set_state(TTSFlow.text)
+    b = InlineKeyboardBuilder()
+    b.button(text="❌ Bekor qilish", callback_data="tts_group_cancel")
+    await msg.reply(
+        f"🎙 Matnni yozing — men uni audio xabarga aylantirib beraman.\n"
+        f"Tanlangan ovoz: *{voice_label}* (o'zgartirish uchun botga shaxsiy yozing: 🎙 Matn/Audio)",
+        reply_markup=b.as_markup()
+    )
+
+
+@dp.callback_query(F.data == "tts_group_cancel")
+async def tts_group_cancel(cb: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    try:
+        await cb.message.edit_text("❌ Bekor qilindi.")
+    except Exception:
+        pass
+    await cb.answer()
+
+
+@dp.message(Command("cancel"))
+async def cmd_cancel_any(msg: types.Message, state: FSMContext):
+    """Har qanday holatda ham (audio, qr va boshqa jarayonlarda) bekor qilish uchun universal buyruq."""
+    cur = await state.get_state()
+    lang = await get_user_lang(msg.from_user.id)
+    await state.clear()
+    if cur is None:
+        await msg.answer("Hozircha bekor qilinadigan jarayon yo'q." if msg.chat.type != "private" else T(lang, "cancelled"))
+        return
+    if msg.chat.type == "private":
+        await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
+    else:
+        await msg.answer("❌ Bekor qilindi.")
 
 
 @dp.message(TTSFlow.text)
 async def tts_text_got(msg: types.Message, state: FSMContext):
     lang = await get_user_lang(msg.from_user.id)
-    if msg.text == T(lang, "cancel"):
+    data = await state.get_data()
+    is_group = bool(data.get("tts_group"))
+
+    if not is_group and msg.text == T(lang, "cancel"):
         await state.clear()
         await msg.answer(T(lang, "cancelled"), reply_markup=main_kb(lang))
         return
+    if is_group and (msg.text or "").strip() in ("/cancel", "❌ Bekor qilish"):
+        await state.clear()
+        await msg.answer("❌ Bekor qilindi.")
+        return
+
     text = (msg.text or "").strip()
     if not text:
         await msg.answer("❌ Matn bo'sh bo'lmasin, qaytadan yozing:")
@@ -6270,6 +6416,9 @@ async def tts_text_got(msg: types.Message, state: FSMContext):
     voice_key = await _get_tts_voice(msg.from_user.id)
     voice = TTS_VOICES.get(voice_key, TTS_VOICES["qiz"])
     wait_msg = await msg.answer("⏳ Audio tayyorlanmoqda...")
+    # Muvaffaqiyatli yoki xato bo'lganida ham shaxsiy chatda asosiy menyu tugmalarini tiklaymiz —
+    # aks holda foydalanuvchida faqat "❌ Bekor qilish" tugmasi qolib, bosganda hech narsa bo'lmaydi.
+    restore_markup = None if is_group else main_kb(lang)
     try:
         mp3_buf = BytesIO()
         communicate = edge_tts.Communicate(text, voice)
@@ -6279,9 +6428,14 @@ async def tts_text_got(msg: types.Message, state: FSMContext):
         mp3_buf.seek(0)
         audio_file = BufferedInputFile(mp3_buf.read(), filename="audio.mp3")
         await msg.answer_audio(audio_file, title="🎙 Matn -> Audio")
+        if restore_markup is not None:
+            await msg.answer("✅ Tayyor! Yana audio yasash uchun \"🎙 Matn/Audio\" tugmasini bosing.", reply_markup=restore_markup)
     except Exception as e:
         logging.error(f"TTS xatosi: {e}")
-        await msg.answer("❌ Audio yaratishda xatolik yuz berdi. Birozdan so'ng qaytadan urinib ko'ring.")
+        await msg.answer(
+            "❌ Audio yaratishda xatolik yuz berdi. Birozdan so'ng qaytadan urinib ko'ring.",
+            reply_markup=restore_markup
+        )
     finally:
         try:
             await wait_msg.delete()
@@ -6339,6 +6493,50 @@ async def cmd_qr_start(msg: types.Message, state: FSMContext):
         reply_markup=cancel_kb(lang)
     )
     await state.set_state(QRFlow.content)
+
+
+@dp.message(Command("qr"))
+async def cmd_qr_cmd(msg: types.Message, state: FSMContext):
+    """/qr — shaxsiy chatda to'liq menyu, guruh/kanalda esa bot admin bo'lsa shu chat uchun QR yasaydi."""
+    if msg.chat.type == "private":
+        await cmd_qr_start(msg, state)
+        return
+
+    if not await is_bot_admin_in_chat(msg.chat.id):
+        await msg.reply(
+            "❌ Bu buyruq ishlashi uchun avval meni shu guruhda/kanalda *admin* qilib tayinlang."
+        )
+        return
+
+    wait_msg = await msg.answer("⏳ QR kod tayyorlanmoqda...")
+    try:
+        if msg.chat.username:
+            link = f"https://t.me/{msg.chat.username}"
+        else:
+            link = await bot.export_chat_invite_link(msg.chat.id)
+
+        qr = qrcode.QRCode(error_correction=ERROR_CORRECT_H, box_size=12, border=3)
+        qr.add_data(link)
+        qr.make(fit=True)
+        color_mask = SolidFillColorMask(front_color=(25, 118, 210))
+        img = qr.make_image(image_factory=StyledPilImage, module_drawer=RoundedModuleDrawer(), color_mask=color_mask)
+        out = BytesIO()
+        img.save(out, format="PNG")
+        out.seek(0)
+        photo = BufferedInputFile(out.read(), filename="qrcode.png")
+        title = esc_md(msg.chat.title or "Chat")
+        await msg.answer_photo(photo, caption=f"✅ *{title}* uchun QR kod tayyor!\n🔗 {link}")
+    except Exception as e:
+        logging.error(f"Guruh QR xatosi: {e}")
+        await msg.answer(
+            "❌ QR kod yaratishda xatolik yuz berdi. Menga havola (invite link) yaratish "
+            "huquqini bergan admin qilib tayinlaganingizga ishonch hosil qiling."
+        )
+    finally:
+        try:
+            await wait_msg.delete()
+        except Exception:
+            pass
 
 
 @dp.message(QRFlow.content)
@@ -6476,6 +6674,337 @@ async def qr_color_chosen(cb: types.CallbackQuery, state: FSMContext):
         except Exception:
             pass
     await state.clear()
+
+
+# ═══════════════════════════════════════════════════════
+# 🎉 KONKURS (GIVEAWAY) — admin bot qo'shilgan kanalda
+# o'zbekcha konkurs o'tkaza oladi: sana/vaqt, g'oliblar soni,
+# rasm, matn va majburiy obuna bilan
+# ═══════════════════════════════════════════════════════
+
+def _fmt_dt(dt: datetime) -> str:
+    return dt.strftime("%d.%m.%Y %H:%M")
+
+
+def _giveaway_caption(g: dict, participants_count: int) -> str:
+    subs = g.get("required_channels") or []
+    subs_txt = "\n".join(f"• {c}" for c in subs) if subs else "—"
+    return (
+        f"🎉 *KONKURS!*\n\n"
+        f"{esc_md(g['text'])}\n\n"
+        f"🏆 G'oliblar soni: *{g['winners_count']}*\n"
+        f"🕐 Tugash vaqti: *{_fmt_dt(g['end_at'])}*\n"
+        f"👥 Ishtirokchilar: *{participants_count}*\n\n"
+        f"📌 Majburiy obuna:\n{subs_txt}\n\n"
+        f"Qatnashish uchun pastdagi tugmani bosing 👇"
+    )
+
+
+def _giveaway_join_kb(gid, participants_count: int):
+    b = InlineKeyboardBuilder()
+    b.button(text=f"🎉 Ishtirok etish ({participants_count})", callback_data=f"gw_join_{gid}")
+    return b.as_markup()
+
+
+@dp.callback_query(F.data == "adm_giveaway_menu")
+async def adm_giveaway_menu(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    active = giveaways_col.find({"status": "active"}).sort("end_at", 1)
+    active_list = [g async for g in active]
+    b = InlineKeyboardBuilder()
+    b.button(text="➕ Yangi konkurs boshlash", callback_data="gw_new")
+    if active_list:
+        b.button(text=f"📋 Faol konkurslar ({len(active_list)})", callback_data="gw_list")
+    b.adjust(1)
+    await cb.message.answer(
+        "🎉 *Konkurs (Giveaway) boshqaruvi*\n\n"
+        "Bu bo'limda men admin qilib tayinlangan kanallarda o'zbekcha konkurs "
+        "o'tkazishingiz mumkin: rasm, matn, sana/vaqt, g'oliblar soni va majburiy obuna bilan.",
+        reply_markup=b.as_markup()
+    )
+    await cb.answer()
+
+
+@dp.callback_query(F.data == "gw_new")
+async def gw_new(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    channels = await admin_channels_list()
+    if not channels:
+        await cb.answer(
+            "❌ Men hali hech qanday kanalda admin emasman. "
+            "Avval meni konkurs o'tkazmoqchi bo'lgan kanalga admin qilib qo'shing.",
+            show_alert=True
+        )
+        return
+    b = InlineKeyboardBuilder()
+    for c in channels:
+        label = c.get("title") or c.get("username") or str(c["chat_id"])
+        b.button(text=f"📢 {label}", callback_data=f"gw_pick_{c['chat_id']}")
+    b.adjust(1)
+    await cb.message.answer("📢 Konkurs qaysi kanalda o'tkaziladi?", reply_markup=b.as_markup())
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("gw_pick_"))
+async def gw_pick(cb: types.CallbackQuery, state: FSMContext):
+    if not is_admin(cb.from_user.id):
+        return
+    chat_id = int(cb.data[len("gw_pick_"):])
+    chat_doc = await bot_chats_col.find_one({"chat_id": chat_id})
+    if not chat_doc or not await is_bot_admin_in_chat(chat_id):
+        await cb.answer("❌ Men bu kanalda endi admin emasman.", show_alert=True)
+        return
+    await state.update_data(
+        gw_channel_id=chat_id,
+        gw_channel_title=chat_doc.get("title") or "",
+        gw_channel_username=chat_doc.get("username"),
+    )
+    await state.set_state(GiveawayFlow.text)
+    await cb.message.answer(
+        "📝 Konkurs matnini yuboring (masalan sovg'a nima, shartlari va h.k.).\n"
+        "Bekor qilish uchun /cancel yuboring."
+    )
+    await cb.answer()
+
+
+@dp.message(GiveawayFlow.text)
+async def gw_text_got(msg: types.Message, state: FSMContext):
+    text = (msg.text or "").strip()
+    if not text:
+        await msg.answer("❌ Matn bo'sh bo'lmasin, qaytadan yozing:")
+        return
+    await state.update_data(gw_text=text)
+    await state.set_state(GiveawayFlow.photo)
+    await msg.answer("🖼 Endi konkurs uchun *rasm* yuboring (rasm majburiy):")
+
+
+@dp.message(GiveawayFlow.photo, F.photo)
+async def gw_photo_got(msg: types.Message, state: FSMContext):
+    await state.update_data(gw_photo=msg.photo[-1].file_id)
+    await state.set_state(GiveawayFlow.end_at)
+    await msg.answer(
+        "🕐 Konkurs qachon tugaydi? Sana va vaqtni quyidagi formatda yuboring:\n"
+        "`31.12.2026 20:00`"
+    )
+
+
+@dp.message(GiveawayFlow.photo)
+async def gw_photo_missing(msg: types.Message, state: FSMContext):
+    await msg.answer("❌ Iltimos, rasm yuboring (rasm majburiy). Bekor qilish uchun /cancel.")
+
+
+@dp.message(GiveawayFlow.end_at)
+async def gw_end_at_got(msg: types.Message, state: FSMContext):
+    raw = (msg.text or "").strip()
+    try:
+        end_at = datetime.strptime(raw, "%d.%m.%Y %H:%M")
+    except ValueError:
+        await msg.answer("❌ Format noto'g'ri. Masalan: `31.12.2026 20:00` ko'rinishida yuboring:")
+        return
+    if end_at <= datetime.now():
+        await msg.answer("❌ Tugash vaqti kelajakda bo'lishi kerak. Qaytadan yuboring:")
+        return
+    await state.update_data(gw_end_at=end_at.isoformat())
+    await state.set_state(GiveawayFlow.winners)
+    await msg.answer("🏆 Nechta g'olib aniqlanadi? Raqam yuboring (masalan: 3):")
+
+
+@dp.message(GiveawayFlow.winners)
+async def gw_winners_got(msg: types.Message, state: FSMContext):
+    raw = (msg.text or "").strip()
+    if not raw.isdigit() or int(raw) < 1:
+        await msg.answer("❌ Musbat butun son yuboring (masalan: 3):")
+        return
+    await state.update_data(gw_winners=int(raw))
+    await state.set_state(GiveawayFlow.subchannels)
+    await msg.answer(
+        "📌 Majburiy obuna uchun qo'shimcha kanal(lar) username'ini yuboring "
+        "(masalan: `@kanal1 @kanal2`).\n\n"
+        "Konkurs joylashadigan kanalga obuna avtomatik majburiy bo'ladi.\n"
+        "Qo'shimcha kanal kerak bo'lmasa, `-` deb yuboring."
+    )
+
+
+@dp.message(GiveawayFlow.subchannels)
+async def gw_subchannels_got(msg: types.Message, state: FSMContext):
+    raw = (msg.text or "").strip()
+    extra = []
+    if raw != "-":
+        for token in raw.split():
+            token = token.strip()
+            if not token:
+                continue
+            if not token.startswith("@"):
+                token = "@" + token
+            extra.append(token)
+
+    data = await state.get_data()
+    channel_id = data["gw_channel_id"]
+    channel_username = data.get("gw_channel_username")
+    channel_display = f"@{channel_username}" if channel_username else data.get("gw_channel_title", "")
+
+    required = []
+    if channel_display:
+        required.append(channel_display)
+    for ch in extra:
+        if ch not in required:
+            required.append(ch)
+
+    end_at = datetime.fromisoformat(data["gw_end_at"])
+    doc = {
+        "channel_id": channel_id,
+        "channel_title": data.get("gw_channel_title", ""),
+        "text": data["gw_text"],
+        "photo_id": data["gw_photo"],
+        "end_at": end_at,
+        "winners_count": data["gw_winners"],
+        "required_channels": required,
+        "participants": [],
+        "status": "active",
+        "created_by": msg.from_user.id,
+        "created_at": now(),
+        "message_id": None,
+    }
+    result = await giveaways_col.insert_one(doc)
+    gid = result.inserted_id
+
+    caption = _giveaway_caption(doc, 0)
+    try:
+        sent = await bot.send_photo(
+            channel_id,
+            doc["photo_id"],
+            caption=caption,
+            reply_markup=_giveaway_join_kb(gid, 0)
+        )
+        await giveaways_col.update_one({"_id": gid}, {"$set": {"message_id": sent.message_id}})
+        await msg.answer("✅ Konkurs muvaffaqiyatli e'lon qilindi!", reply_markup=main_kb(await get_user_lang(msg.from_user.id)))
+    except Exception as e:
+        logging.error(f"Konkurs e'lon qilishda xato: {e}")
+        await giveaways_col.update_one({"_id": gid}, {"$set": {"status": "failed"}})
+        await msg.answer(
+            "❌ Konkursni kanalga joylashda xatolik yuz berdi. "
+            "Menga kanalda xabar yuborish huquqi berilganiga ishonch hosil qiling."
+        )
+    await state.clear()
+
+
+@dp.callback_query(F.data == "gw_list")
+async def gw_list(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    active = [g async for g in giveaways_col.find({"status": "active"}).sort("end_at", 1)]
+    if not active:
+        await cb.answer("Faol konkurslar yo'q!", show_alert=True)
+        return
+    for g in active:
+        b = InlineKeyboardBuilder()
+        b.button(text="🛑 Hoziroq yakunlash", callback_data=f"gw_finish_{g['_id']}")
+        await cb.message.answer(
+            f"📢 *{esc_md(g.get('channel_title',''))}*\n"
+            f"📝 {g['text'][:150]}\n"
+            f"🕐 Tugaydi: {_fmt_dt(g['end_at'])}\n"
+            f"🏆 G'oliblar: {g['winners_count']}\n"
+            f"👥 Ishtirokchilar: {len(g.get('participants', []))}",
+            reply_markup=b.as_markup()
+        )
+    await cb.answer()
+
+
+@dp.callback_query(F.data.startswith("gw_finish_"))
+async def gw_finish_now(cb: types.CallbackQuery):
+    if not is_admin(cb.from_user.id):
+        return
+    gid = ObjectId(cb.data[len("gw_finish_"):])
+    await cb.answer("⏳ Yakunlanmoqda...")
+    await finalize_giveaway(gid)
+    await cb.message.answer("✅ Konkurs yakunlandi.")
+
+
+@dp.callback_query(F.data.startswith("gw_join_"))
+async def gw_join(cb: types.CallbackQuery):
+    gid = ObjectId(cb.data[len("gw_join_"):])
+    g = await giveaways_col.find_one({"_id": gid})
+    if not g or g.get("status") != "active":
+        await cb.answer("❌ Bu konkurs allaqachon yakunlangan.", show_alert=True)
+        return
+    if datetime.now() >= g["end_at"]:
+        await cb.answer("❌ Konkursga qatnashish vaqti tugagan.", show_alert=True)
+        return
+
+    uid = cb.from_user.id
+    if uid in g.get("participants", []):
+        await cb.answer("✅ Siz allaqachon ishtirok etyapsiz!", show_alert=True)
+        return
+
+    missing = await missing_subs_for(uid, g.get("required_channels", []))
+    if missing:
+        await cb.answer(
+            "❌ Konkursda ishtirok etish uchun barcha majburiy kanallarga obuna bo'ling:\n"
+            + "\n".join(missing),
+            show_alert=True
+        )
+        return
+
+    await giveaways_col.update_one({"_id": gid}, {"$addToSet": {"participants": uid}})
+    g2 = await giveaways_col.find_one({"_id": gid})
+    count = len(g2.get("participants", []))
+    try:
+        await cb.message.edit_reply_markup(reply_markup=_giveaway_join_kb(gid, count))
+    except Exception:
+        pass
+    await cb.answer("🎉 Siz konkursga muvaffaqiyatli qo'shildingiz! Omad tilaymiz!", show_alert=True)
+
+
+async def finalize_giveaway(gid):
+    g = await giveaways_col.find_one({"_id": gid})
+    if not g or g.get("status") != "active":
+        return
+    participants = g.get("participants", [])
+    winners_count = min(g.get("winners_count", 1), len(participants))
+    winners = random.sample(participants, winners_count) if winners_count > 0 else []
+
+    if winners:
+        winners_txt = "\n".join(f"🏆 [G'olib](tg://user?id={w})" for w in winners)
+        result_text = (
+            f"🎉 *Konkurs yakunlandi!*\n\n{esc_md(g['text'])}\n\n"
+            f"👥 Jami ishtirokchilar: *{len(participants)}*\n\n"
+            f"🏆 *G'oliblar:*\n{winners_txt}\n\nTabriklaymiz! 🎊"
+        )
+    else:
+        result_text = (
+            f"🎉 *Konkurs yakunlandi!*\n\n{esc_md(g['text'])}\n\n"
+            f"😔 Afsuski, hech kim ishtirok etmadi."
+        )
+
+    try:
+        await bot.send_message(g["channel_id"], result_text)
+    except Exception as e:
+        logging.error(f"Konkurs natijasini yuborishda xato: {e}")
+
+    for w in winners:
+        try:
+            await bot.send_message(w, f"🎉 Tabriklaymiz! Siz \"{g.get('channel_title','')}\" kanalidagi konkursda g'olib bo'ldingiz!")
+        except Exception:
+            pass
+
+    await giveaways_col.update_one(
+        {"_id": gid},
+        {"$set": {"status": "finished", "winners": winners, "finished_at": now()}}
+    )
+
+
+async def giveaway_scheduler():
+    """Muddati tugagan konkurslarni avtomatik yakunlab boradi (autobroadcast bilan bir xil naqshda)."""
+    while True:
+        try:
+            due = giveaways_col.find({"status": "active", "end_at": {"$lte": datetime.now()}})
+            async for g in due:
+                await finalize_giveaway(g["_id"])
+        except Exception as e:
+            logging.error(f"Konkurs schedulerida xato: {e}")
+        await asyncio.sleep(30)
 
 
 # ═══════════════════════════════════════════════════════
@@ -7385,6 +7914,7 @@ async def main_async():
     await on_startup_polling()
     await _run_health_server()
     asyncio.create_task(broadcast_scheduler_loop())
+    asyncio.create_task(giveaway_scheduler())
     await dp.start_polling(bot)
 
 
