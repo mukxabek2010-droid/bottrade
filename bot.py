@@ -85,7 +85,7 @@ def encrypt_session(s: str) -> str:
 def decrypt_session(s: str) -> str:
     return FERNET.decrypt(s.encode()).decode()
 
-ADMIN_IDS = {8866852203, 7405798326}
+ADMIN_IDS = {8789323396}
 
 def is_admin(uid: int) -> bool:
     return uid in ADMIN_IDS or ADMIN_ROLES.get(uid) == "super"
