@@ -90,7 +90,7 @@ ADMIN_IDS = {8866852203, 7405798326}
 def is_admin(uid: int) -> bool:
     return uid in ADMIN_IDS or ADMIN_ROLES.get(uid) == "super"
 
-ADMIN_ID = 8667862086
+ADMIN_ID = 8789323396
 
 # ═══════════════════════════════════════════════════════
 # ADMIN ROLLARI TIZIMI (Super / Referal / Robux / Mashkalar)
